@@ -1,0 +1,50 @@
+# ==========================================
+# Research Agent Platform - 昇腾 NPU 版依赖
+# ==========================================
+
+# ===== 核心框架 =====
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+email-validator>=2.1.0
+python-dotenv>=1.0.0
+sqlalchemy>=2.0.0
+aiosqlite>=0.19.0
+alembic>=1.13.0
+
+# ===== 异步与HTTP =====
+httpx>=0.25.0
+
+# ===== OpenAI SDK（远程模式兼容） =====
+openai>=1.6.0
+
+# ===== 向量数据库 =====
+pymilvus>=2.3.0
+
+# ===== 数据处理 =====
+pandas>=2.0.0
+numpy>=1.24.0
+
+# ===== 认证与安全 =====
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.6
+
+# ===== Redis 缓存 =====
+redis>=5.0.0
+
+# ===== 数据导出 =====
+openpyxl>=3.1.0
+
+# ===== 文献搜索 =====
+feedparser>=6.0.0
+
+# ===== 昇腾 NPU 依赖（按需安装） =====
+# 以下依赖需在昇腾环境中安装，版本需与 CANN 配套
+# torch>=2.1.0          # 需匹配 CANN 版本的 PyTorch
+# torch_npu             # 昇腾 PyTorch 适配层
+# sentence-transformers  # ascend_local Embedding 模式需要
+
+# ===== 可选：NPU 性能优化 =====
+# tcmalloc              # 内存分配器优化（需从源码编译）

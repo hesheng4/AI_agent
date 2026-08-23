@@ -1,0 +1,30 @@
+name: nature-paper-to-patent
+version: 2.0.0
+
+always_load:
+  - static/core/principles.md
+  - static/core/workflow.md
+  - static/core/output-contract.md
+
+axes:
+  source_format:
+    values:
+      - pdf-text
+      - scanned-pdf
+      - pasted-text
+      - mixed-project
+    default: pdf-text
+  task_mode:
+    values:
+      - full-draft
+      - claim-set
+      - disclosure-analysis
+      - paper-patent-audit
+    default: full-draft
+  invention_type:
+    values:
+      - algorithm-software
+      - apparatus-system
+      - process-material
+      - mixed
+    default: algorithm-software

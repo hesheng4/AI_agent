@@ -1,0 +1,30 @@
+name: nature-polishing
+version: 6.1.0
+description: Declarative manifest for the static/dynamic split of nature-polishing.
+always_load:
+- static/core/stance.md
+- static/core/failure-modes.md
+- static/core/output-format.md
+axes:
+  paper_type:
+    values:
+      research: static/fragments/paper_type/research.md
+      methods: static/fragments/paper_type/methods.md
+      hypothesis: static/fragments/paper_type/hypothesis.md
+      algorithmic: static/fragments/paper_type/algorithmic.md
+      review: static/fragments/paper_type/review.md
+    multi: false
+references:
+  on_demand:
+  - condition: published article patterns
+    path: references/published-article-patterns.md
+  - condition: section moves
+    path: references/section-moves.md
+  - condition: phrasebank playbook
+    path: references/phrasebank-playbook.md
+  - condition: style guardrails
+    path: references/style-guardrails.md
+  - condition: writing strategy
+    path: references/writing-strategy.md
+  - condition: LaTeX layout (排版)
+    path: references/latex-layout.md

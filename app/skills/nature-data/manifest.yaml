@@ -1,0 +1,7 @@
+name: nature-data
+version: 2.0.0
+
+always_load:
+  - static/core/stance.md
+  - static/core/chinese-mode.md
+  - static/core/workflow.md

@@ -1,0 +1,54 @@
+# 环境变量与密钥（严禁烘焙进镜像）
+.env
+.env.*
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv/
+env/
+
+# 测试
+tests/
+.pytest_cache
+htmlcov/
+.coverage
+
+# 文档
+docs/
+*.md
+
+# Docker
+docker-compose*.yml
+Dockerfile
+
+# 日志
+logs/
+*.log
+
+# 临时文件
+*.tmp
+*.bak
+*.swp
+
+# 数据文件
+*.db
+*.sqlite
+uploads/
+
+# Node
+node_modules/

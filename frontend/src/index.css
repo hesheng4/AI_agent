@@ -1,0 +1,431 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== 墨观 · 学术天文台 Design System — SaaS Dashboard ===== */
+
+:root {
+  /* 语义色 token — 暖金主题 */
+  --color-bg: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-surface-muted: #F1F5F9;
+  --color-border: #E2E8F0;
+  --color-text: #2C2418;
+  --color-text-muted: #6B5B45;
+
+  --color-primary: #C9A961;
+  --color-primary-hover: #B8963E;
+  --color-primary-active: #9A7E45;
+  --color-primary-foreground: #FFFFFF;
+  --color-primary-ring: rgba(201, 169, 97, 0.4);
+  --color-primary-muted: rgba(201, 169, 97, 0.08);
+  --color-primary-border: rgba(201, 169, 97, 0.3);
+
+  --color-cta: #C9A961;
+  --color-cta-hover: #B8963E;
+  --color-cta-active: #9A7E45;
+  --color-cta-foreground: #FFFFFF;
+  --color-cta-ring: rgba(201, 169, 97, 0.5);
+
+  --color-danger: #DC2626;
+  --color-danger-hover: #B91C1C;
+  --color-success: #16A34A;
+  --color-warning: #D97706;
+
+  --color-txt: #2C2418;
+  --color-txt-muted: #6B5B45;
+  --color-txt-light: #8B7E6A;
+}
+
+.dark {
+  /* 暖墨黑系 — 与 Layout/Hero 主题统一 */
+  --color-bg: #16110D;
+  --color-surface: #1C1610;
+  --color-surface-muted: #241812;
+  --color-border: rgba(201, 169, 97, 0.18);
+  --color-text: #E8E4DC;
+  --color-text-muted: rgba(232, 228, 220, 0.6);
+
+  /* 主色：暖金（与 Hero/Layout 一致） */
+  --color-primary: #C9A961;
+  --color-primary-hover: #E0C896;
+  --color-primary-active: #9A7E45;
+  --color-primary-foreground: #16110D;
+  --color-primary-ring: rgba(201, 169, 97, 0.4);
+  --color-primary-muted: rgba(201, 169, 97, 0.06);
+  --color-primary-border: rgba(201, 169, 97, 0.25);
+
+  /* CTA：暖金亮色 */
+  --color-cta: #E0C896;
+  --color-cta-hover: #C9A961;
+  --color-cta-active: #9A7E45;
+  --color-cta-foreground: #16110D;
+  --color-cta-ring: rgba(224, 200, 150, 0.5);
+
+  --color-danger: #F87171;
+  --color-danger-hover: #EF4444;
+  --color-success: #4ADE80;
+  --color-warning: #FBBF24;
+
+  --color-txt: #E8E4DC;
+  --color-txt-muted: rgba(232, 228, 220, 0.6);
+  --color-txt-light: rgba(232, 228, 220, 0.4);
+}
+
+@layer base {
+  body {
+    font-family: 'DM Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+}
+
+@layer components {
+  /* ===== 按钮体系 — 5 个 variant ===== */
+
+  /* Primary Button — 核心动作 */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    background-color: var(--color-primary);
+    color: var(--color-primary-foreground);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .btn-primary:hover {
+    background-color: var(--color-primary-hover);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+  .btn-primary:active {
+    background-color: var(--color-primary-active);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+  .btn-primary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-primary-ring);
+  }
+  .btn-primary:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* CTA Button — 商业关键动作 */
+  .btn-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    background-color: var(--color-cta);
+    color: var(--color-cta-foreground);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .btn-cta:hover {
+    background-color: var(--color-cta-hover);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+  .btn-cta:active {
+    background-color: var(--color-cta-active);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+  .btn-cta:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-cta-ring);
+  }
+  .btn-cta:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* Secondary Button — 次级动作 */
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-primary-border);
+    background-color: var(--color-primary-muted);
+    color: var(--color-primary);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .btn-secondary:hover {
+    background-color: rgba(201, 169, 97, 0.1);
+    border-color: rgba(201, 169, 97, 0.4);
+  }
+  .btn-secondary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-primary-ring);
+  }
+  .btn-secondary:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* Ghost Button — 低优先级动作 */
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--color-txt-muted);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .btn-ghost:hover {
+    background-color: var(--color-surface-muted);
+    color: var(--color-txt);
+  }
+  .btn-ghost:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-primary-ring);
+  }
+  .btn-ghost:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* Danger Button — 删除/危险操作 */
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    background-color: var(--color-danger);
+    color: #FFFFFF;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .btn-danger:hover {
+    background-color: var(--color-danger-hover);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+  .btn-danger:active {
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+  .btn-danger:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px rgba(248, 113, 113, 0.5);
+  }
+  .btn-danger:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* 按钮尺寸 */
+  .btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+  }
+  .btn-md {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+  }
+  .btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+  }
+  .btn-icon {
+    height: 2.75rem;
+    width: 2.75rem;
+    padding: 0;
+  }
+
+  /* ===== 卡片 — 白色浮层 + 边框 ===== */
+  .card {
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    transition: all 0.2s ease;
+  }
+  .card:hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    border-color: rgba(201, 169, 97, 0.3);
+  }
+
+  .card-muted {
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface-muted);
+    padding: 1.5rem;
+  }
+
+  /* ===== 输入框 ===== */
+  .input {
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-txt);
+    transition: border-color 0.2s ease;
+  }
+  .input::placeholder {
+    color: var(--color-txt-light);
+  }
+  .input:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(201, 169, 97, 0.12);
+  }
+
+  /* ===== 玻璃面板（登录页专用） ===== */
+  .glass-panel {
+    border-radius: 1rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  }
+
+  /* ===== 搜索框发光效果 ===== */
+  .search-glow {
+    transition: all 0.2s ease;
+  }
+  .search-glow:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(201, 169, 97, 0.12);
+  }
+  .search-glow:hover {
+    border-color: rgba(201, 169, 97, 0.3);
+  }
+}
+
+/* ===== CoordinatorAudit · Mission Control 动画 ===== */
+@keyframes ping-slow {
+  0% { opacity: 0.6; transform: scale(1); }
+  75%, 100% { opacity: 0; transform: scale(1.15); }
+}
+.animate-ping-slow { animation: ping-slow 2.4s cubic-bezier(0, 0, 0.2, 1) infinite; }
+
+/* ===== 无障碍：尊重 prefers-reduced-motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ===== 滚动条美化 ===== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.35);
+}
+
+/* ===== 着陆页暖金主题（Hero 专用） ===== */
+.wg-text { color: #C9A961; }
+.wg-text-light { color: #E0C896; }
+.wg-text-deep { color: #9A7E45; }
+.wg-text-faint { color: rgba(224, 200, 150, 0.55); }
+.wg-border { border-color: rgba(201, 169, 97, 0.22); }
+.wg-border-faint { border-color: rgba(201, 169, 97, 0.12); }
+.wg-border-strong { border-color: rgba(201, 169, 97, 0.4); }
+.wg-bg-soft { background-color: rgba(201, 169, 97, 0.06); }
+.wg-bg-panel { background-color: rgba(24, 18, 12, 0.5); }
+.wg-bg-card { background-color: rgba(30, 23, 16, 0.55); }
+.wg-gradient {
+  background: linear-gradient(135deg, #E0C896 0%, #C9A961 50%, #9A7E45 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 哑光颗粒肌理 */
+.wg-grain { position: relative; }
+.wg-grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.78 0 0 0 0 0.66 0 0 0 0 0.38 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+}
+
+/* 磨砂玻璃按钮 */
+.wg-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(26, 20, 14, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(201, 169, 97, 0.28);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(224, 200, 150, 0.1), 0 8px 24px rgba(0, 0, 0, 0.25);
+  color: #F2E2C2; /* 普通态：亮金文字对深墨半透背景，对比度足 */
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease,
+    box-shadow 0.3s ease, transform 0.3s ease;
+  cursor: pointer;
+}
+.wg-btn:hover {
+  background: rgba(16, 12, 8, 0.85); /* 加深墨底而非变金，避免金底金字低对比 */
+  border-color: rgba(224, 200, 150, 0.6);
+  color: #F5EAD0; /* hover 提亮文字，与深墨底保持高对比 */
+  box-shadow: inset 0 1px 0 rgba(224, 200, 150, 0.2), 0 10px 32px rgba(201, 169, 97, 0.22);
+  transform: translateY(-1px);
+}
+.wg-btn:focus-visible {
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(224, 200, 150, 0.18), 0 0 0 3px rgba(201, 169, 97, 0.3);
+}
+
+/* 暖金渐变文字（与 Hero 一致，废弃蓝色命名） */
+.text-tech-gradient {
+  background: linear-gradient(135deg, #E0C896 0%, #C9A961 50%, #9A7E45 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-copper-gradient {
+  background: linear-gradient(135deg, #E0C896 0%, #C9A961 50%, #9A7E45 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}

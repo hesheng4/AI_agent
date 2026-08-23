@@ -1,0 +1,20 @@
+name: nature-cover
+version: 0.1.0
+description: >
+  Declarative manifest for the static/dynamic split of nature-cover.
+always_load:
+  - static/core/stance.md
+  - static/core/chinese-mode.md
+  - static/core/workflow.md
+references:
+  on_demand:
+    - condition: cover-letter anatomy, hook patterns, length budget
+      path: references/letter-anatomy.md
+    - condition: fit-to-journal argument, scope matching
+      path: references/fit-and-significance.md
+    - condition: declarations, reviewers, presubmission format
+      path: references/declarations-and-logistics.md
+    - condition: Chinese bilingual submission wording
+      path: references/chinese-author-alignment.md
+    - condition: primary source justification
+      path: references/source-basis.md

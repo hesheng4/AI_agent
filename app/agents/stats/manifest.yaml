@@ -1,0 +1,22 @@
+name: nature-stats
+version: 0.1.0
+description: >
+  Declarative manifest for the static/dynamic split of nature-stats.
+always_load:
+  - static/core/stance.md
+  - static/core/chinese-mode.md
+  - static/core/workflow.md
+references:
+  on_demand:
+    - condition: governing Nature reporting-checklist rules
+      path: references/reporting-standards.md
+    - condition: choose or justify a test
+      path: references/test-selection.md
+    - condition: exact-p formatting, effect-size, CI, error-bar, n/replicate
+      path: references/effect-size-and-reporting.md
+    - condition: multiple-comparison correction, pitfalls
+      path: references/pitfalls-and-corrections.md
+    - condition: Chinese bilingual statistical wording
+      path: references/chinese-author-alignment.md
+    - condition: primary source justification
+      path: references/source-basis.md

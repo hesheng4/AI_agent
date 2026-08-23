@@ -1,0 +1,63 @@
+[tool.poetry]
+name = "research-agent-platform"
+version = "0.1.0"
+description = "高等教育科研效率提升Agent平台"
+authors = ["Research Team"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.104.0"
+uvicorn = "^0.24.0"
+pydantic = "^2.5.0"
+pydantic-settings = "^2.1.0"
+sqlalchemy = "^2.0.23"
+alembic = "^1.13.0"
+asyncpg = "^0.29.0"
+redis = "^5.0.1"
+openai = "^1.6.0"
+pymilvus = "^2.3.6"
+python-jose = "^3.3.0"
+passlib = "^1.7.4"
+python-multipart = "^0.0.6"
+httpx = "^0.25.2"
+pandas = "^2.1.4"
+numpy = "^1.26.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-asyncio = "^0.23.2"
+pytest-cov = "^4.1.0"
+black = "^23.12.0"
+ruff = "^0.1.8"
+mypy = "^1.7.1"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "YTT"]
+
+[tool.ruff.lint.per-file-ignores]
+# prompts 内容文件：长行为 LLM 提示词文本本身，拆分物理行会改变内容
+"app/agents/*/prompts.py" = ["E501"]
+# 独立 CLI 工具脚本：长行为 HTML/XML 模板与输出格式内容，非代码质量问题
+"app/agents/*/scripts/*.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: integration tests",
+    "performance: performance tests",
+    "e2e: end-to-end tests"
+]

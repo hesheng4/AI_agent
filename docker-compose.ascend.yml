@@ -1,0 +1,213 @@
+# 昇腾 NPU 部署 Docker Compose 配置
+# 用法: docker-compose -f docker-compose.ascend.yml up -d
+#
+# 前置条件:
+# 1. 宿主机已安装 CANN >= 8.0 和 NPU 驱动
+# 2. 已加载 Ascend Docker Runtime
+# 3. 模型文件已下载到 /models 目录
+
+version: "3.8"
+
+services:
+  # ========== vLLM-Ascend 推理服务 ==========
+  vllm-ascend:
+    image: quay.io/ascend/vllm-ascend:latest
+    container_name: vllm-ascend
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      - /models:/models:ro
+    environment:
+      - ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+    command: >
+      vllm serve /models/Qwen2.5-72B-Instruct
+      --tensor-parallel-size 4
+      --dtype bfloat16
+      --max-model-len 8192
+      --max-num-seqs 16
+      --port 8000
+      --trust-remote-code
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: ascend
+              count: 4
+              capabilities: [npu]
+    networks:
+      - agent-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # ========== Embedding 服务 (vLLM-Ascend) ==========
+  vllm-embedding:
+    image: quay.io/ascend/vllm-ascend:latest
+    container_name: vllm-embedding
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    volumes:
+      - /models:/models:ro
+    environment:
+      - ASCEND_RT_VISIBLE_DEVICES=4
+    command: >
+      vllm serve /models/bge-large-zh-v1.5
+      --task embed
+      --dtype bfloat16
+      --max-model-len 512
+      --port 8000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: ascend
+              count: 1
+              capabilities: [npu]
+    networks:
+      - agent-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ========== Research Agent 主服务 ==========
+  research-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.ascend
+    container_name: research-agent
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_MODE=ascend
+      - ASCEND_VLLM_BASE_URL=http://vllm-ascend:8000/v1
+      - ASCEND_LLM_MODEL=Qwen/Qwen2.5-72B-Instruct
+      - EMBEDDING_MODE=ascend_api
+      - ASCEND_EMBEDDING_MODEL=BAAI/bge-large-zh-v1.5
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/research_agent
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=false
+    depends_on:
+      vllm-ascend:
+        condition: service_healthy
+      vllm-embedding:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - agent-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========== Milvus 向量数据库 ==========
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: milvus-etcd
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+    volumes:
+      - etcd-data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379
+    networks:
+      - agent-net
+
+  minio:
+    image: minio/minio:latest
+    container_name: milvus-minio
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - minio-data:/minio_data
+    command: minio server /minio_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - agent-net
+
+  milvus:
+    image: milvusdb/milvus:v2.3.3
+    container_name: milvus-standalone
+    restart: unless-stopped
+    ports:
+      - "19530:19530"
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - milvus-data:/var/lib/milvus
+    depends_on:
+      - etcd
+      - minio
+    networks:
+      - agent-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # ========== PostgreSQL 数据库 ==========
+  db:
+    image: postgres:15-alpine
+    container_name: pg-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=research_agent
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agent-net
+
+  # ========== Redis 缓存 ==========
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - agent-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  agent-net:
+    driver: bridge
+
+volumes:
+  etcd-data:
+  minio-data:
+  milvus-data:
+  redis-data:
+  postgres-data:

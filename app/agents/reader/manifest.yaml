@@ -1,0 +1,24 @@
+name: nature-reader
+version: 2.0.0
+description: Declarative manifest for the static/dynamic split of nature-reader.
+always_load:
+- static/core/principles.md
+- static/core/workflow.md
+- static/core/output-contract.md
+axes:
+  source_format:
+    values:
+      pdf-text: static/fragments/source/pdf-text.md
+      scanned-pdf: static/fragments/source/scanned-pdf.md
+      html: static/fragments/source/html.md
+      doi-arxiv: static/fragments/source/doi-arxiv.md
+      pasted-text: static/fragments/source/pasted-text.md
+    multi: true
+references:
+  on_demand:
+  - condition: figure/table extraction and placement
+    path: references/figure-extraction.md
+  - condition: paper.md / source_map.json schema
+    path: references/output-spec.md
+  - condition: source-grounded follow-up Q&A
+    path: references/grounding-rules.md

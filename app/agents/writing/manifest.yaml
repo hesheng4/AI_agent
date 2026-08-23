@@ -1,0 +1,28 @@
+name: nature-writing
+version: 1.0.0
+description: Declarative manifest for the static/dynamic split of nature-writing.
+always_load:
+- static/core/stance.md
+- static/core/workflow.md
+- static/core/output-format.md
+axes:
+  paper_type:
+    values:
+      research: static/fragments/paper_type/research.md
+      methods: static/fragments/paper_type/methods.md
+      hypothesis: static/fragments/paper_type/hypothesis.md
+      algorithmic: static/fragments/paper_type/algorithmic.md
+      review: static/fragments/paper_type/review.md
+    multi: false
+references:
+  on_demand:
+  - condition: article architecture
+    path: references/article-architecture.md
+  - condition: abstract drafting
+    path: references/abstract.md
+  - condition: Nature summary paragraph
+    path: references/nature-summary-paragraph.md
+  - condition: paragraph flow
+    path: references/paragraph-flow.md
+  - condition: self-review and rejection-risk
+    path: references/paper-review.md

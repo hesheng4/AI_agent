@@ -1,0 +1,101 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# AI 工具工作目录 / 缓存（可再生，不入库）
+.arts/
+.atomcode/
+.codeartsdoer/
+.workbuddy/
+.claude/
+.pwtest/
+.arts
+debug_sessions/
+
+# 根目录一次性脚本与快照（外部技能库维护产物）
+_notes_part*.py
+_apply_notes.py
+_tmp_*.txt
+_skills_*.txt
+skill_meta.tsv
+skills_dedupe_report.md
+.e501.txt
+pw_*.md
+
+# 第三方参考库（内含嵌套 .git，单独管理）
+nature-skills/
+
+# 前端构建产物与编辑器日志
+frontend/dist/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+frontend/vite.log
+frontend/vite_err.log
+frontend/css/output.css
+
+# 运行时输出（对齐结果 JSON）
+reports/*.json
+
+# Windows 误建文件
+nul
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite3
+
+# Docker
+docker-compose.override.yml
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Poetry
+poetry.lock
+
+# Node
+node_modules/

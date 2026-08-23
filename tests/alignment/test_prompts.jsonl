@@ -1,0 +1,8 @@
+{"label": "simple_zh", "messages": [{"role": "user", "content": "请用一句话介绍量子计算。"}]}
+{"label": "simple_en", "messages": [{"role": "user", "content": "What is machine learning in one sentence?"}]}
+{"label": "reasoning", "messages": [{"role": "user", "content": "如果A比B高5cm，B比C高3cm，A比C高多少？"}]}
+{"label": "creative", "messages": [{"role": "user", "content": "写一首关于春天的四行诗。"}]}
+{"label": "science", "messages": [{"role": "user", "content": "解释牛顿第三定律及其在火箭推进中的应用。"}]}
+{"label": "summarize", "messages": [{"role": "user", "content": "用三句话总结深度学习的发展历史。"}]}
+{"label": "code", "messages": [{"role": "user", "content": "写一个Python函数计算斐波那契数列的第n项。"}]}
+{"label": "multi_turn", "messages": [{"role": "user", "content": "什么是Transformer架构？"}, {"role": "assistant", "content": "Transformer是一种基于自注意力机制的深度学习架构。"}, {"role": "user", "content": "它的主要优势是什么？"}]}

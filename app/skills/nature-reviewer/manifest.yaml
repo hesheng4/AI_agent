@@ -1,0 +1,6 @@
+name: nature-reviewer
+version: 2.0.0
+
+always_load:
+  - static/core/stance.md
+  - static/core/workflow.md

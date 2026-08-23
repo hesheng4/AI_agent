@@ -1,0 +1,20 @@
+name: nature-reviewer
+version: 0.1.0
+description: Declarative manifest for the static/dynamic split of nature-reviewer.
+always_load:
+- static/core/stance.md
+- static/core/workflow.md
+references:
+  on_demand:
+  - condition: source basis
+    path: references/source-basis.md
+  - condition: reviewer workflow
+    path: references/reviewer-workflow.md
+  - condition: review axes
+    path: references/review-axes.md
+  - condition: report structure
+    path: references/report-structure.md
+  - condition: role boundaries
+    path: references/role-boundaries.md
+  - condition: QA checklist
+    path: references/qa-checklist.md

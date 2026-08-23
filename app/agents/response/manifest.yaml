@@ -1,0 +1,20 @@
+name: nature-response
+version: 1.0.0
+description: Declarative manifest for the static/dynamic split of nature-response.
+always_load:
+- static/core/stance.md
+- static/core/workflow.md
+references:
+  on_demand:
+  - condition: intake and routing
+    path: references/intake-and-routing.md
+  - condition: comment taxonomy
+    path: references/comment-taxonomy.md
+  - condition: action mapping
+    path: references/action-mapping.md
+  - condition: tone and stance
+    path: references/tone-and-stance.md
+  - condition: difficult cases
+    path: references/difficult-cases.md
+  - condition: QA checklist
+    path: references/qa-checklist.md

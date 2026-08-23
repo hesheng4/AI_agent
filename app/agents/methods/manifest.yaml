@@ -1,0 +1,18 @@
+name: nature-methods
+version: 0.1.0
+always_load:
+  - static/core/stance.md
+  - static/core/chinese-mode.md
+  - static/core/workflow.md
+references:
+  on_demand:
+    - condition: reproducibility checklist, forbidden-phrase list
+      path: references/reproducibility-checklist.md
+    - condition: ethics, rigor elements
+      path: references/ethics-and-rigor.md
+    - condition: reporting standards, main/Supplementary split
+      path: references/reporting-standards-and-structure.md
+    - condition: Chinese bilingual
+      path: references/chinese-author-alignment.md
+    - condition: source basis
+      path: references/source-basis.md

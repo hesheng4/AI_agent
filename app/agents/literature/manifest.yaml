@@ -1,0 +1,27 @@
+name: nature-academic-search
+version: 2.0.0
+description: Declarative manifest for the static/dynamic split of nature-academic-search.
+always_load:
+- static/core/tools.md
+- static/core/routing-and-ops.md
+axes:
+  workflow:
+    values:
+      multi-source-search: static/fragments/workflow/multi-source-search.md
+      citation-verification: static/fragments/workflow/citation-verification.md
+      mesh-strategy: static/fragments/workflow/mesh-strategy.md
+      citation-file-mgmt: static/fragments/workflow/citation-file-mgmt.md
+      reference-mgmt: static/fragments/workflow/reference-mgmt.md
+    multi: true
+references:
+  on_demand:
+  - condition: source reliability tiers T1/T2/T3
+    path: references/source-tiers.md
+  - condition: deduplication across sources
+    path: references/dedup-engine.md
+  - condition: citation extraction from documents
+    path: references/citation-parser.md
+  - condition: query construction and result ranking
+    path: references/search-strategy.md
+  - condition: RIS/BibTeX format specs
+    path: references/ris-bibtex-format.md

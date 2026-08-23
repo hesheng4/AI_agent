@@ -1,0 +1,26 @@
+name: nature-figure
+version: 2.0.0
+description: Declarative manifest for the static/dynamic split of nature-figure.
+always_load:
+- static/core/contract.md
+- static/core/stance.md
+axes:
+  backend:
+    values:
+      python: static/fragments/backend/python.md
+      r: static/fragments/backend/r.md
+    multi: false
+references:
+  on_demand:
+  - condition: figure contract and review-risk checks
+    path: references/figure-contract.md
+  - condition: backend selection
+    path: references/backend-selection.md
+  - condition: R workflow
+    path: references/r-workflow.md
+  - condition: QA contract
+    path: references/qa-contract.md
+  - condition: design theory
+    path: references/design-theory.md
+  - condition: Python API and palette
+    path: references/api.md

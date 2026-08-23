@@ -1,0 +1,39 @@
+name: nature-polishing
+version: 2.0.0
+
+always_load:
+  - ../_shared/core/terminology-ledger.md
+  - static/core/stance.md
+  - static/core/failure-modes.md
+  - static/core/workflow.md
+
+axes:
+  paper_type:
+    values:
+      - research
+      - methods
+      - hypothesis
+      - algorithmic
+      - review
+    default: research
+  section:
+    values:
+      - abstract
+      - intro
+      - results
+      - discussion
+      - conclusion
+      - title
+      - methods
+    multi: true
+  language:
+    values:
+      - en
+      - zh-to-en
+    default: en
+  journal:
+    values:
+      - nature
+      - nat-comms
+      - generic
+    default: generic

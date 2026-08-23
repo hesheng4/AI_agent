@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  # API服务
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/research_agent
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
+      - MILVUS_HOST=milvus
+      - MILVUS_PORT=19530
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
+      - DEBUG=${DEBUG:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    networks:
+      - app-network
+
+  # Celery Worker (异步任务)
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A app.core.queue worker --loglevel=info --concurrency=4
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/research_agent
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - api
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # PostgreSQL数据库
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=research_agent
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Milvus向量数据库
+  milvus:
+    image: milvusdb/milvus:latest
+    ports:
+      - "19530:19530"
+    volumes:
+      - milvus_data:/var/lib/milvus
+    environment:
+      - ETCD_USE_EMBED=true
+      - COMMON_STORAGETYPE=local
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Nginx反向代理 (可选)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - app-network
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+  redis_data:
+  milvus_data:
+
+networks:
+  app-network:
+    driver: bridge

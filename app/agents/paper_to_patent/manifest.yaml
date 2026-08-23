@@ -1,0 +1,26 @@
+name: nature-paper-to-patent
+version: 1.0.0
+description: Declarative manifest for the static/dynamic split of nature-paper-to-patent.
+always_load:
+- static/core/workflow.md
+- static/core/output-contract.md
+axes:
+  task_mode:
+    values:
+      full_draft: static/fragments/task_mode/full-draft.md
+      claims_only: static/fragments/task_mode/claims-only.md
+      disclosure: static/fragments/task_mode/disclosure.md
+      audit: static/fragments/task_mode/audit.md
+    multi: false
+references:
+  on_demand:
+  - condition: draft schema
+    path: references/draft-schema.md
+  - condition: Chinese patent format
+    path: references/chinese-patent-format.md
+  - condition: claim structure
+    path: references/claim-structure.md
+  - condition: Office Math formulas
+    path: references/office-math.md
+  - condition: validation script
+    path: references/validation.md

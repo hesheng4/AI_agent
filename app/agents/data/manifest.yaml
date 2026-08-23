@@ -1,0 +1,19 @@
+name: nature-data
+version: 2.0.0
+description: Declarative manifest for the static/dynamic split of nature-data.
+always_load:
+- static/core/stance.md
+- static/core/chinese-mode.md
+- static/core/workflow.md
+references:
+  on_demand:
+  - condition: Nature data-sharing policy
+    path: references/policy-principles.md
+  - condition: Chinese author alignment
+    path: references/chinese-author-alignment.md
+  - condition: statement patterns
+    path: references/statement-patterns.md
+  - condition: repository/DOI/accession guidance
+    path: references/repository-and-identifiers.md
+  - condition: FAIR metadata checklist
+    path: references/fair-metadata-checklist.md
