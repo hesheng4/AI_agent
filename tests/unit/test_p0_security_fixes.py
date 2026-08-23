@@ -49,10 +49,18 @@ async def test_spa_fallback_still_serves_index(client):
 # ---------------------------------------------------------------------------
 
 _ASCEND_AUTHED_ENDPOINTS = [
+    # P0 补鉴权的三组（原为 0 鉴权）
     ("GET", "/api/v1/ascend/info"),
     ("PUT", "/api/v1/ascend/mode"),
     ("GET", "/api/v1/adaptation/status"),
     ("GET", "/api/v1/alignment/status"),
+    # 其余六个 ascend 域路由（原有鉴权，防回归）
+    ("POST", "/api/v1/debugging/phase1/boundary-evidence"),
+    ("POST", "/api/v1/history-to-skill/generate"),
+    ("POST", "/api/v1/perf-tuning/analyze-script"),
+    ("GET", "/api/v1/profiling/checklist"),
+    ("POST", "/api/v1/toolchain/aisbench"),
+    ("POST", "/api/v1/validator/accuracy"),
 ]
 
 

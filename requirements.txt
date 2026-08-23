@@ -30,6 +30,8 @@ httpx>=0.25.2
 
 # 数据处理
 pandas>=2.1.4
+# 图表（figure agent 的 matplotlib 后端）
+matplotlib>=3.8.0
 numpy>=1.26.2
 
 # 工具

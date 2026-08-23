@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 墨观 · 学术天文台：墨底金星轨道 -->
+  <rect width="64" height="64" rx="14" fill="#16110D"/>
+  <circle cx="32" cy="32" r="18" fill="none" stroke="#C9A961" stroke-width="2.6"/>
+  <circle cx="32" cy="32" r="6.2" fill="#C9A961"/>
+  <circle cx="44.7" cy="19.3" r="2.4" fill="#C9A961" fill-opacity="0.7"/>
+</svg>

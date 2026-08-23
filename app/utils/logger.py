@@ -1,4 +1,5 @@
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -18,6 +19,16 @@ LOG_FORMAT = (
 )
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+# PII 脱敏（体检报告 P2-16）：登录/注册等日志会带真实用户邮箱
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})")
+
+
+def _redact_pii(message: str) -> str:
+    """邮箱保留首字符与域名：alice@example.com → a***@example.com"""
+    if "@" not in message:
+        return message
+    return _EMAIL_RE.sub(lambda m: f"{m.group(0)[0]}***@{m.group(1)}", message)
+
 
 class _TraceContextFilter(logging.Filter):
     """注入当前 contextvars 中的 trace_id/span_id/agent 到每条日志"""
@@ -26,6 +37,18 @@ class _TraceContextFilter(logging.Filter):
         record.trace_id = get_trace_id() or "-"
         record.span_id = get_span_id() or "-"
         record.agent = get_agent() or "-"
+        return True
+
+
+class _PIIRedactFilter(logging.Filter):
+    """日志落盘/输出前脱敏邮箱（在格式化前改写 msg，args 已合并）"""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.args:
+            record.msg = record.getMessage()
+            record.args = None
+        if isinstance(record.msg, str):
+            record.msg = _redact_pii(record.msg)
         return True
 
 
@@ -38,6 +61,7 @@ def get_logger(name: str) -> logging.Logger:
 
     logger.setLevel(logging.DEBUG if settings.DEBUG else logging.INFO)
     logger.addFilter(_TraceContextFilter())
+    logger.addFilter(_PIIRedactFilter())
 
     fmt = logging.Formatter(LOG_FORMAT, DATE_FORMAT)
 

@@ -46,29 +46,6 @@ class BaseAgent(ABC):
         resolved_model = self._resolve_model(user_api_model)
         return resolved_key, resolved_url, resolved_model
 
-    def _validate_tools(self) -> None:
-        """校验 self.tools 中声明的工具都可被找到
-
-        支持两种模式：
-        1. Agent 自身实现 `_tool_{name}` 方法（直接模式）
-        2. Agent 设置 `self.tools_handler` 对象，其上有对应的 `{name}` 方法（委托模式）
-        """
-        missing = []
-        for tool_name in self.tools:
-            # 优先检查 Agent 自身是否实现 _tool_{name} 方法
-            handler = getattr(self, f"_tool_{tool_name}", None)
-            if handler is not None and callable(handler):
-                continue
-            # 降级检查 tools_handler 是否有对应方法
-            handler = self._get_tool_handler(tool_name)
-            if handler is None:
-                missing.append(tool_name)
-        if missing:
-            raise TypeError(
-                f"Agent[{self.name}] 声明了工具但找不到实现: {missing}，"
-                f"请在 Agent 上实现 _tool_<name> 方法，或设置 self.tools_handler 对象"
-            )
-
     def _get_tool_handler(self, tool_name: str):
         """查找工具处理函数，支持自身方法或 tools_handler 委托"""
         # 检查自身 _tool_{name} 方法

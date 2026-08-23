@@ -52,6 +52,27 @@ select = ["E", "F", "W", "I", "N", "UP", "YTT"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
+# 类型收敛策略（体检报告 P2-13）：存量 1198 错渐进修复，新文件必须零新增——
+# 提交前跑 mypy 只看自己改动文件的错误数不上升。
+# agents/*/scripts/ 是独立 CLI 模板（自带 sys.path 引导与文本模板），不参与类型检查
+exclude = 'app/agents/[^/]+/scripts/'
+
+# 可选运行时依赖（NPU / 文档格式 / 图表）：缺失时业务代码有 try/except 降级，
+# 类型层面按 Any 处理
+[[tool.mypy.overrides]]
+module = [
+  "torch.*",
+  "torch_npu.*",
+  "sentence_transformers.*",
+  "matplotlib.*",
+  "PIL.*",
+  "fitz.*",
+  "pptx.*",
+  "pypdf.*",
+  "latex2mathml.*",
+  "plotly.*",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

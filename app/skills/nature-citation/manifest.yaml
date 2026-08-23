@@ -1,7 +1,0 @@
-name: nature-citation
-version: 2.0.0
-
-always_load:
-  - static/core/principles.md
-  - static/core/chinese-mode.md
-  - static/core/workflow.md
