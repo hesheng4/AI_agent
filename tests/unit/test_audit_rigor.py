@@ -96,8 +96,13 @@ def test_audit_expired_refresh_rejected():
 
 def test_audit_tampered_token_rejected():
     access = create_access_token(data={"sub": "u1", "email": "a@b.c"})
-    # Flip last char — breaks signature.
-    tampered = access[:-1] + ("A" if access[-1] != "A" else "B")
+    # Flip the FIRST char of the signature segment — a deterministic
+    # byte-level change. (Flipping the LAST char is flaky: the trailing
+    # base64url char carries 2 ignored padding bits, so some flips decode
+    # to identical signature bytes and are legitimately accepted.)
+    _header, _payload, sig = access.split(".")
+    flipped_sig = ("B" if sig[0] != "B" else "C") + sig[1:]
+    tampered = f"{_header}.{_payload}.{flipped_sig}"
     assert decode_access_token(tampered) is None
     assert decode_refresh_token(tampered) is None
 

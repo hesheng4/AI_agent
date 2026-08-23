@@ -5,7 +5,8 @@
 - 目录名即 agent_name（如 literature/ → agent_name="literature"）
 - coordinator 自身不注册（它是调度器，非业务 Agent）
 
-新增 Agent 只需在 agents/ 下建目录 + agent.py + manifest.yaml，无需改本文件。
+新增 Agent 只需在 agents/ 下建目录 + agent.py（BaseAgent 子类），无需改本文件；
+刻意不继承 BaseAgent 的独立 Agent（如不依赖 LLM 的 figure）加入 EXTRA_AGENTS。
 """
 
 from __future__ import annotations
@@ -21,6 +22,13 @@ logger = get_logger("agents.registry")
 
 # 自动扫描结果缓存: {agent_name: (module_path, class_name)}
 _AGENT_REGISTRY: dict[str, tuple[str, str]] | None = None
+
+# 不继承 BaseAgent、需显式注册的独立 Agent 白名单。
+# figure 不依赖 LLM（纯 matplotlib 工具），刻意不继承 BaseAgent，
+# 但 planner 关键词表/工作流模板都引用它，必须可被 coordinator 加载。
+EXTRA_AGENTS: dict[str, tuple[str, str]] = {
+    "figure": ("app.agents.figure.agent", "FigureAgent"),
+}
 
 
 def _scan_agents() -> dict[str, tuple[str, str]]:
@@ -64,6 +72,7 @@ def _scan_agents() -> dict[str, tuple[str, str]]:
                 logger.debug(f"自动注册发现 Agent: {entry.name} → {obj.__name__}")
                 break
 
+    registry.update(EXTRA_AGENTS)
     logger.info(
         f"Agent 自动注册完成，发现 {len(registry)} 个 Agent: {list(registry.keys())}"
     )

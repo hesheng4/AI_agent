@@ -280,7 +280,9 @@ class FigureAgent:
         """
         task = request.get("task", "create_contract")
 
-        if task == "create_contract":
+        # "generate" 是工作流模板（write_from_scratch 第 7 步）使用的任务名，
+        # 语义等价于 create_contract
+        if task in ("create_contract", "generate"):
             return self.tools.create_contract(
                 conclusion=request.get("conclusion", ""),
                 evidence_chain=request.get("evidence_chain", []),

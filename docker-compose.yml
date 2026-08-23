@@ -16,7 +16,8 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
       - MILVUS_HOST=milvus
       - MILVUS_PORT=19530
-      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
+      # SECRET_KEY 不设默认值：缺失时 compose 报错，避免弱密钥静默进入生产
+      - SECRET_KEY=${SECRET_KEY?SECRET_KEY must be set (openssl rand -hex 32)}
       - DEBUG=${DEBUG:-false}
     depends_on:
       db:
@@ -58,7 +59,8 @@ services:
   db:
     image: postgres:15-alpine
     ports:
-      - "5432:5432"
+      # 仅本机调试用；容器间走 app-network，无需对外暴露
+      - "127.0.0.1:5432:5432"
     environment:
       - POSTGRES_DB=research_agent
       - POSTGRES_USER=postgres
@@ -78,7 +80,8 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      # 无密码实例，绝不能直接暴露到宿主公网
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
@@ -95,7 +98,7 @@ services:
   milvus:
     image: milvusdb/milvus:latest
     ports:
-      - "19530:19530"
+      - "127.0.0.1:19530:19530"
     volumes:
       - milvus_data:/var/lib/milvus
     environment:

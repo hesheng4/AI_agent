@@ -111,14 +111,11 @@ async def lifespan(app: FastAPI):
         try:
             await _run_alembic_upgrade()
             logger.info("Alembic 迁移已执行至 head")
-        except Exception as e:
-            logger.error(f"Alembic 迁移失败: {e}", exc_info=True)
-            # 迁移失败兜底：用 create_all 保证开发可用
-            from app.core.database import Base, engine
-
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-            logger.warning("迁移失败，已用 create_all 兜底建表")
+        except Exception:
+            # 迁移失败必须启动失败：create_all 兜底会绕过迁移链，
+            # 造成两套 schema 永久漂移（体检报告 P1-9）
+            logger.error("Alembic 迁移失败，拒绝启动", exc_info=True)
+            raise
     else:
         # 未启用迁移时用 create_all 保证开发可用
         from app.core.database import Base, engine

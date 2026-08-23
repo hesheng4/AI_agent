@@ -15,13 +15,15 @@ services:
     container_name: vllm-ascend
     restart: unless-stopped
     ports:
-      - "8001:8000"
+      # vLLM 无认证，仅限宿主本机调试访问；容器间走 agent-net
+      - "127.0.0.1:8001:8000"
     volumes:
       - /models:/models:ro
     environment:
       - ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
     command: >
       vllm serve /models/Qwen2.5-72B-Instruct
+      --served-model-name Qwen/Qwen2.5-72B-Instruct
       --tensor-parallel-size 4
       --dtype bfloat16
       --max-model-len 8192
@@ -50,13 +52,14 @@ services:
     container_name: vllm-embedding
     restart: unless-stopped
     ports:
-      - "8002:8000"
+      - "127.0.0.1:8002:8000"
     volumes:
       - /models:/models:ro
     environment:
       - ASCEND_RT_VISIBLE_DEVICES=4
     command: >
       vllm serve /models/bge-large-zh-v1.5
+      --served-model-name BAAI/bge-large-zh-v1.5
       --task embed
       --dtype bfloat16
       --max-model-len 512
@@ -148,7 +151,7 @@ services:
     container_name: milvus-standalone
     restart: unless-stopped
     ports:
-      - "19530:19530"
+      - "127.0.0.1:19530:19530"
     environment:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
@@ -190,7 +193,8 @@ services:
     container_name: redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      # 无密码实例，仅限宿主本机访问
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     networks:

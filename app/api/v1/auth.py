@@ -377,6 +377,9 @@ async def patch_me(
     if request.api_key is not None:
         current_user.api_key = request.api_key
     if request.api_base_url is not None:
+        # 与 PUT /auth/api-config 一致：写入前必须过 SSRF 校验，
+        # 否则用户级客户端会向内网地址发起请求（带 api_key）
+        _validate_api_base_url(request.api_base_url)
         current_user.api_base_url = request.api_base_url
     if request.api_model is not None:
         current_user.api_model = request.api_model
@@ -543,6 +546,9 @@ async def update_api_config(
     if request.api_key is not None:
         current_user.api_key = request.api_key
     if request.api_base_url is not None:
+        # 与 PUT /auth/api-config 一致：写入前必须过 SSRF 校验，
+        # 否则用户级客户端会向内网地址发起请求（带 api_key）
+        _validate_api_base_url(request.api_base_url)
         current_user.api_base_url = request.api_base_url
     if request.api_model is not None:
         current_user.api_model = request.api_model

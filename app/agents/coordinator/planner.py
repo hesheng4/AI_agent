@@ -43,9 +43,16 @@ SKILL_KEYWORD_MAP: list[tuple[str, list[str], list[str]]] = [
         ["figure", "chart", "plot", "visualization", "graph"],
     ),
     (
+        # data_agent 必须排在 data 之前：identify_agents 的关键词特异性
+        # 规则会让「数据可用性」命中 data_agent 而不再拖上通用的 data
+        "data_agent",
+        ["数据可用性", "数据声明", "数据共享", "数据仓库"],
+        ["data availability", "data statement", "repository"],
+    ),
+    (
         "data",
-        ["数据", "数据可用性", "数据声明"],
-        ["data", "data availability", "dataset"],
+        ["数据分析", "数据集", "数据"],
+        ["data", "dataset"],
     ),
     (
         "reviewer",
@@ -134,8 +141,13 @@ CAPABILITY_MAP: dict[str, dict[str, Any]] = {
     },
     "data": {
         "stage": "数据",
-        "tasks": ["statement", "check", "deposit"],
-        "description": "数据可用性声明",
+        "tasks": ["analyze", "visualize", "upload", "summary"],
+        "description": "数据分析与可视化",
+    },
+    "data_agent": {
+        "stage": "数据",
+        "tasks": ["generate-statement", "audit-statement", "select-repository"],
+        "description": "数据可用性声明（FAIR 合规）",
     },
     "reviewer": {
         "stage": "自审",
@@ -191,7 +203,12 @@ WORKFLOW_TEMPLATES: dict[str, dict[str, Any]] = {
             {"step": 5, "agent": "methods", "task": "draft", "desc": "起草Methods"},
             {"step": 6, "agent": "stats", "task": "draft", "desc": "统计报告起草"},
             {"step": 7, "agent": "figure", "task": "generate", "desc": "生成图表"},
-            {"step": 8, "agent": "data", "task": "statement", "desc": "数据可用性声明"},
+            {
+                "step": 8,
+                "agent": "data_agent",
+                "task": "generate-statement",
+                "desc": "数据可用性声明",
+            },
             {"step": 9, "agent": "polishing", "task": "polish", "desc": "全文润色"},
             {"step": 10, "agent": "reviewer", "task": "review", "desc": "自审模拟"},
             {"step": 11, "agent": "citation", "task": "check", "desc": "引用检查"},
@@ -281,31 +298,39 @@ class TaskPlanner:
                 self._keyword_index[kw.lower()] = agent_name
 
     def identify_agents(self, request: dict[str, Any]) -> list[str]:
-        """识别需要的Agent — 覆盖全部 16 skill 关键词"""
-        agents_needed: list[str] = []
-
+        """识别需要的Agent — 覆盖全部 17 skill 关键词"""
         task_type = request.get("task", "")
 
         # 1) 精确匹配 task 字段
         matched = self._keyword_index.get(task_type.lower())
         if matched:
-            agents_needed.append(matched)
-            return list(dict.fromkeys(agents_needed))  # 去重保序
+            return [matched]
 
-        # 2) 关键词扫描 task 字段
-        task_lower = task_type.lower()
-        for kw, agent_name in self._keyword_index.items():
-            if kw in task_lower:
-                agents_needed.append(agent_name)
-
-        # 3) 兜底: 扫描整个 request
+        # 2) 关键词扫描 task 字段；3) 兜底扫描整个 request
+        text = task_type if task_type else ""
+        agents_needed = self._match_keywords(text)
         if not agents_needed:
-            content = str(request).lower()
-            for kw, agent_name in self._keyword_index.items():
-                if kw in content:
-                    agents_needed.append(agent_name)
+            agents_needed = self._match_keywords(str(request))
 
-        return list(dict.fromkeys(agents_needed))
+        return agents_needed
+
+    def _match_keywords(self, text: str) -> list[str]:
+        """关键词扫描 + 特异性去重
+
+        「数据可用性」命中 data_agent 时，其超串「数据」（data）不应
+        再把通用 agent 拉进来——保留更长关键词对应的 agent。
+        """
+        text_lower = text.lower()
+        matched: dict[str, str] = {}  # kw -> agent_name（保持插入序）
+        for kw, agent_name in self._keyword_index.items():
+            if kw in text_lower:
+                matched[kw] = agent_name
+        agents: list[str] = []
+        for kw, agent_name in matched.items():
+            if any(kw != other and kw in other for other in matched):
+                continue  # 存在更长的关键词已覆盖此通用词
+            agents.append(agent_name)
+        return list(dict.fromkeys(agents))
 
     def decompose_task(self, request: dict[str, Any], agents: list[str]) -> list[dict]:
         """分解任务"""

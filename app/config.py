@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_BACKEND: str = "memory"
     # Redis 不可用时限流降级策略: "allow" (放行，保证可用性) / "deny" (拒绝，保证安全)
     RATE_LIMIT_FALLBACK: str = "allow"
+    # 是否对科研域（LLM 生成类）API 启用按用户套餐限流（RATE_LIMITS 表）
+    RATE_LIMIT_API_ENABLED: bool = True
 
     # ========== 请求体大小限制（S2）==========
     # 全局 HTTP 请求体上限（字节）：超限直接 413，避免内存被恶意大 payload 耗尽
@@ -183,10 +185,9 @@ class Settings(BaseSettings):
         # 非调试模式下必须配置 API Key 加密密钥
         if not self.DEBUG and not self.API_KEY_ENCRYPTION_KEY:
             raise RuntimeError(
-                "生产环境必须配置 API_KEY_ENCRYPTION_KEY，"(
-                    "运行 python -c 'from cryptography.fernet import Fernet; "
-                    "print(Fernet.generate_key().decode())' 生成"
-                )
+                "生产环境必须配置 API_KEY_ENCRYPTION_KEY，"
+                "运行 python -c 'from cryptography.fernet import Fernet; "
+                "print(Fernet.generate_key().decode())' 生成"
             )
 
 
