@@ -178,10 +178,9 @@ def workflow_to_execution_plan(workflow: dict[str, Any]) -> list[dict[str, Any]]
             raise ValueError(f"节点 {n.get('id')} 缺少 agent 字段")
         if agent in seen_agents:
             raise ValueError(
-                f"重复 agent 名 '{agent}'：节点 {seen_agents[agent]} 与 {n['id']}。"(
-                    "coordinator 按(agent)名索引上游结果，同名节点会互相覆盖，"
-                    "请改用不同 agent 或合并节点。"
-                )
+                f"重复 agent 名 '{agent}'：节点 {seen_agents[agent]} 与 {n['id']}。"
+                "coordinator 按(agent)名索引上游结果，同名节点会互相覆盖，"
+                "请改用不同 agent 或合并节点。"
             )
         seen_agents[agent] = n["id"]
 

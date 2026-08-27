@@ -544,8 +544,9 @@ flowchart LR
   重复 agent 名三重校验后复用同一个 `_execute_plan_parallel` 引擎——用户 DAG 没有静态表，
   因此**不存在闭包问题**（实测：data 的静态上游 experiment 不在图中也正常执行），
   但也没有事件推送（实测确认，§4.5）。
-  注意：三重校验中"重复 agent 名"分支自身有缺陷，触发时抛 `TypeError` 而非设计的
-  `ValueError`（实测复现，见第 10 章差距 #9）。
+  注意：三重校验中"重复 agent 名"分支曾有一处缺陷（f-string 后误带 `(`，触发时抛
+  `TypeError` 而非设计的 `ValueError`），2026-08-27 已修复并加回归测试
+  `tests/unit/test_workflow_dag_validation.py`（见第 10 章差距 #9）。
 
 ---
 
@@ -724,7 +725,7 @@ Coordinator 页当前仅消费单 Agent 路由与静态能力表（§4.5/§6.3�
 | 6 | **`EncryptedString` 缺 Fernet 密钥时明文落库**，仅 warn 不报错 | `app/models/types.py:32-34` | 生产环境用户 LLM api_key 可能明文存储；`validate_security()` 在生产强制 Fernet 密钥（缓解项） |
 | 7 | **空目录占位**：`docs/api/`、`docs/architecture/`（本文档是首份）、`docs/deployment/`、`tests/integration/api/`、`tests/e2e/`、`tests/performance/`、`k8s/` | 目录实测 | 文档/测试矩阵名大于实：32 个测试文件 = 31 单测（`tests/unit/`）+ 1 集成（`tests/integration/`），e2e/performance 为空 |
 | 8 | **完整编排 `CoordinatorAgent.process()` 无 HTTP 入口**（本次分析新发现） | `/coordinator/route` 只走 `process_simple`（`api/v1/coordinator.py:37-48`）；`/workflows/{id}/run` 直调 `_execute_plan_parallel` 且不发事件（`api/v1/workflows.py:114`）；`process()` 仅被 `tests/integration/test_e1_e2_auth_passthrough.py:133` 触达 | README 宣传的"多 Agent 并行 + 实时事件流"主链路在 HTTP 层休眠：多 Agent 编排与 WS 进度条目前只有测试能触发 |
-| 9 | **`workflow_to_execution_plan` 的"重复 agent 名"校验分支自身崩溃**：f-string 后误带 `(` 构成字符串调用，抛 `TypeError` 而非设计的 `ValueError`（2026-08-27 实测复现） | `app/core/workflows.py:180-185`；`api/v1/workflows.py:101-104` 只捕获 `ValueError` | 用户画出含重复 agent 名的 DAG 时得到 500 而非友好 400 提示；另两重校验（自环/循环）实测正常 |
+| 9 | **~~`workflow_to_execution_plan` 的"重复 agent 名"校验分支自身崩溃~~（已修复，2026-08-27）**：f-string 后误带 `(` 构成字符串调用，抛 `TypeError` 而非设计的 `ValueError` | 原 `app/core/workflows.py:180-185`；修复后 `api/v1/workflows.py:101-104` 的 `ValueError` 捕获生效 | 回归测试 `tests/unit/test_workflow_dag_validation.py`（6 用例：重复 agent/自环/循环/缺字段/正向映射）已锁定异常类型契约 |
 | 附 | **静态依赖表的闭包问题**（§4.3）：计划未覆盖某 Agent 的全部依赖时报"循环依赖" | `_group_by_level`（`agent.py:190-195`）循环分支；"写论文"单 Agent 任务实测必抛 | 话术需恰好命中全部上游（如"文献检索、阅读理解、写作"）才能走多 Agent 并行 |
 
 ---
