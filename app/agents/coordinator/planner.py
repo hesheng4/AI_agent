@@ -81,8 +81,9 @@ SKILL_KEYWORD_MAP: list[tuple[str, list[str], list[str]]] = [
         ],
     ),
     (
+        # 「报告」已移除：泛化「请给一份报告」曾误路由 PPT（差距 #1），零命中由 LLM 兜底判定
         "paper2ppt",
-        ["PPT", "演讲", "报告", "转化PPT"],
+        ["PPT", "演讲", "转化PPT"],
         ["paper2ppt", "ppt", "presentation", "slides"],
     ),
     (

@@ -4,7 +4,7 @@
 循环依赖检测、懒加载（CO1 回归）、单例（CO7）。
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -182,8 +182,10 @@ def test_singleton_is_coordinator_agent():
 
 @pytest.mark.asyncio
 async def test_process_simple_unknown_task_raises(coordinator):
-    with pytest.raises(AgentException, match="未知任务类型"):
-        await coordinator.process_simple({"task": "xyz_no_match"})
+    """兜底返回空 → 仍抛「未知任务类型」（mock _llm_route，避免真实网络调用）"""
+    with patch.object(coordinator, "_llm_route", new=AsyncMock(return_value=[])):
+        with pytest.raises(AgentException, match="未知任务类型"):
+            await coordinator.process_simple({"task": "xyz_no_match"})
 
 
 # ─────────────────────────────────────────────

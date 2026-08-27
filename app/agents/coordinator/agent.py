@@ -1,4 +1,5 @@
 import asyncio
+import json
 from typing import Any
 
 from app.agents.base import BaseAgent
@@ -10,6 +11,13 @@ from app.utils.exceptions import AgentException
 from app.utils.logger import get_logger
 
 logger = get_logger("agent.coordinator")
+
+_ROUTING_SYSTEM_PROMPT = (
+    "你是研究Agent平台的路由器。根据用户意图，从能力清单中选出真正需要执行的 Agent。"
+    '只返回 JSON，格式：{"agents": ["agent_name"]}。'
+    "规则：1) 只能使用清单中出现的 agent 名；2) 宁可少选，不要臆测；"
+    '3) 无法判断时返回 {"agents": []}。'
+)
 
 
 class CoordinatorAgent(BaseAgent):
@@ -61,6 +69,8 @@ class CoordinatorAgent(BaseAgent):
             )
 
             agents_needed = self.planner.identify_agents(request)
+            if not agents_needed:
+                agents_needed = await self._llm_route(request)
             # 补全缺失上游（静态依赖表闭包不完整会误报循环依赖）
             completed = self.planner.complete_upstream(agents_needed)
             if completed != agents_needed:
@@ -268,15 +278,62 @@ class CoordinatorAgent(BaseAgent):
 
         return integrated
 
+    async def _llm_route(self, request: dict[str, Any]) -> list[str]:
+        """兜底路由：关键词表零命中时，LLM 从能力清单中选择 Agent
+
+        仅在 identify_agents 零命中时调用 — 关键词命中路径保持
+        确定性（零成本、P1-7 回归锁定）。LLM 调用失败 / 非法 JSON /
+        未知名一律返回 []，维持修复前行为：process() 空成功、
+        process_simple() 抛"未知任务类型"。
+        """
+        agents = get_agent_registry()
+        capability_lines = "\n".join(
+            f"- {name}: {cap.get('description', '')}"
+            f"（tasks: {', '.join(cap.get('tasks', []))}）"
+            for name, cap in self.planner.get_capability_map().items()
+            if name in agents
+        )
+        prompt = (
+            f"用户请求：{request.get('task', '')}\n"
+            f"附加内容：{str(request.get('content', ''))[:500]}\n\n"
+            f"能力清单：\n{capability_lines}"
+        )
+        try:
+            text = await self.call_llm(prompt, _ROUTING_SYSTEM_PROMPT, temperature=0.0)
+            raw = text.strip()
+            start, end = raw.find("{"), raw.rfind("}")
+            if start == -1 or end <= start:
+                logger.warning(f"LLM路由返回无法解析，回退零命中行为: {raw[:120]}")
+                return []
+            payload = json.loads(raw[start : end + 1])
+            candidates = payload.get("agents", []) if isinstance(payload, dict) else []
+            if not isinstance(candidates, list):
+                logger.warning("LLM路由返回格式不符，回退零命中行为")
+                return []
+            valid = [a for a in candidates if isinstance(a, str) and a in agents]
+            dropped = [a for a in candidates if a not in valid]
+            if dropped:
+                logger.warning(f"LLM路由含未知名已剔除: {dropped}")
+            return valid
+        except Exception as e:  # noqa: BLE001 兜底不得让主流程崩溃，一律回退零命中
+            logger.warning(f"LLM路由调用失败，回退零命中行为: {e}")
+            return []
+        except json.JSONDecodeError:
+            logger.warning("LLM路由返回非法JSON，回退零命中行为")
+            return []
+
     async def process_simple(self, request: dict[str, Any]) -> dict[str, Any]:
         """简单处理 - 单Agent直接调用，覆盖全部 16 skill
 
         路由复用 planner 的 SKILL_KEYWORD_MAP（消除重复维护），不再本地建 agent_map。
+        关键词零命中时走 _llm_route 兜底（仍为单 Agent 语义，取第一个）。
         """
         task = request.get("task", "")
 
-        # 直接用 planner 关键词路由识别
+        # 直接用 planner 关键词路由识别；零命中走 LLM 兜底（单 Agent 语义，取第一个）
         agents_needed = self.planner.identify_agents(request)
+        if not agents_needed:
+            agents_needed = await self._llm_route(request)
         if not agents_needed:
             raise AgentException(f"未知任务类型: {task}", self.name)
 

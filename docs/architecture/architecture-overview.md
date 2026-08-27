@@ -51,7 +51,7 @@
 **一句话数据流**：
 
 ```
-前端页面 → /api/v1/* (JWT + 套餐限流) → [coordinator 关键词规划]
+前端页面 → /api/v1/* (JWT + 套餐限流) → [coordinator 关键词规划（零命中 LLM 兜底）]
 → 按静态依赖表拓扑分层 → 层内 asyncio.gather 并行执行 Agent
 → 上游结果字段级注入下游 → 汇总返回
 （全程事件经进程内 event_bus → WebSocket → 前端进度条）
@@ -250,7 +250,7 @@ generate_with_usage
 | paper2ppt | `paper2ppt/` | convert | — | — | LLM |
 | paper_to_patent | `paper_to_patent/` | convert | — | — | LLM |
 | polishing | `polishing/` | polish, shorten, simplify | — | — | LLM（流式输出场景） |
-| coordinator | `coordinator/` | （调度器，非业务） | — | 无 | **规划阶段零 LLM 调用**（关键词路由，§4） |
+| coordinator | `coordinator/` | （调度器，非业务） | — | 无 | **关键词路由零 LLM**；仅零命中时 LLM 兜底（§4.1） |
 
 > 昇腾工作台的 9 个"Agent"（ascend/adaptation/alignment/...）**不在此表**——它们是
 > `app/core/*.py` 功能模块，不是 `BaseAgent` 子类，不经 coordinator 调度（第 8 章）。
@@ -347,12 +347,13 @@ analyze_evidence`（L283-351）、`_handle_cite / _handle_export`（L353-392，�
 
 ## 4. 工作流深钻：Coordinator 编排
 
-`CoordinatorAgent`（`app/agents/coordinator/agent.py`，288 行）+ `TaskPlanner`
-（`planner.py`，359 行）是系统的调度核心。**它继承 BaseAgent 但完全不调 LLM**——
-规划、分解、依赖分析全是确定性代码。单例由 `app/agents/coordinator/__init__.py:10-13`
+`CoordinatorAgent`（`app/agents/coordinator/agent.py`，350 行）+ `TaskPlanner`
+（`planner.py`，380 行）是系统的调度核心。规划、分解、依赖分析全是**确定性代码**——
+仅关键词零命中时才调 LLM 兜底选 Agent（temperature=0，命中结果缓存，§4.1）。
+单例由 `app/agents/coordinator/__init__.py:10-13`
 的 `@lru_cache get_coordinator_agent()` 提供，API 路由层在 import 时取走（`api/v1/coordinator.py:13`）。
 
-### 4.1 规划阶段：三级关键词匹配（零 LLM）
+### 4.1 规划阶段：三级关键词匹配 + 零命中 LLM 兜底
 
 `TaskPlanner.identify_agents`（`planner.py:300-315`）按顺序尝试：
 
@@ -369,6 +370,17 @@ analyze_evidence`（L283-351）、`_handle_cite / _handle_export`（L353-392，�
 **局限**：纯子串匹配，无词界、无否定处理——"不要分析数据"仍命中 `data`；
 `SKILL_KEYWORD_MAP` 的 16 组关键词与注册表的一致性由上面的回归测试强制（任何新 Agent 必须同步补关键词表，
 否则测试失败）。
+
+**零命中 LLM 兜底**（2026-08-28 加，关闭第 10 章差距 #1）：三级匹配全零命中时，coordinator 不再静默空转——
+`process()` 与 `process_simple()` 都改调 `_llm_route`（`agent.py:281-323`）：把 task + 截断到 500 字符的
+content 与注册表能力清单（「名: 描述（tasks: …）」逐行）交给 LLM（`temperature=0`，命中 LLM 结果缓存），
+从返回文本里提取 `{"agents": [...]}`，只保留注册表内的名字、未知名剔除并 warn；任何失败
+（调用异常 / 无 JSON 花括号 / 非法 JSON）一律返回 `[]`，回退修复前行为
+（`process()` 空成功、`process_simple()` 抛"未知任务类型"）。关键词命中路径**完全不受影响**——
+零成本、零延迟，P1-7 回归原样不动。同期修剪了 paper2ppt 关键词组中的「报告」：
+泛化的「请给一份报告」曾误路由 PPT，修剪后归零命中交 LLM 判定，
+「转化成PPT演讲」等具体表述仍确定性命中。残余局限：否定处理仍缺失（"不要分析数据"仍命中 `data`）——
+兜底只在零命中时触发，改不动已命中的路径。
 
 ### 4.2 分解与依赖：静态表，不是分析
 
@@ -724,7 +736,7 @@ Coordinator 页当前仅消费单 Agent 路由与静态能力表（§4.5/§6.3�
 
 | # | 差距 | 代码证据 | 影响 |
 |---|---|---|---|
-| 1 | **"智能路由/coordinator"实为关键词匹配 + 静态依赖表**，规划环节零 LLM | `planner.py:5-98`（`SKILL_KEYWORD_MAP`）、`planner.py:278-286`（`AGENT_DEPENDENCIES`）；无 LLM 调用路径 | 路由质量受限于关键词表覆盖；"不要分析数据"类表述仍误路由。一致性由 `tests/unit/test_planner_registry_consistency.py` 锁定（体检报告 P1-7） |
+| 1 | **"智能路由/coordinator"实为关键词匹配 + 静态依赖表**（~~规划环节零 LLM~~：2026-08-28 零命中 LLM 兜底已加） | `planner.py:5-98`（`SKILL_KEYWORD_MAP`）、`planner.py:278-286`（`AGENT_DEPENDENCIES`）；兜底 `_llm_route`（`agent.py:281-323`，temperature=0 + 结果缓存，失败回退零命中行为）；paper2ppt 组移除「报告」关键词（修「请给一份报告」误路由） | 关键词命中路径保持确定性（P1-7 回归不动）；LLM 兜底仅零命中触发，补上关键词表覆盖缺口；"不要分析数据"类否定表述仍误路由（兜底管不到已命中路径）。回归测试 `tests/unit/test_llm_route_fallback.py`（11 用例）锁定兜底接线与解析回退 |
 | 2 | **README 提到的 `manifest_router.py` 不存在**；各 Agent 目录的 `manifest.yaml`/`SKILL.md` 无任何程序解析 | 全 `app/` 435 个文件零 `yaml` import（2026-08-27 实测）；Agent 发现纯靠 `registry.py:34-79` 目录扫描 | manifest 是面向 LLM/文档的声明，不是运行时配置——改 manifest 不影响行为 |
 | 3 | **"Agent 间结果传递"是硬编码字段映射**（4 组 if），非语义级传递 | `agent.py:150-167`（`_inject_upstream`） | 新增数据流需改代码；`upstream_results` 整体可见但多数下游不读 |
 | 4 | **~~compose `celery-worker` 是死引用~~（已移除，2026-08-27）**：`celery -A app.core.queue worker`，而 `app/core/queue.py` 不存在、celery 非依赖（requirements/pyproject 亦无 celery） | 原 `docker-compose.yml:40-56`，整段删除 | 顺带修正 `app/api/v1/__init__.py` docstring 的 research 路由数 19→20 |
@@ -760,7 +772,7 @@ app/
 frontend/src/               # App.tsx(路由+守卫) / api.ts(887行) / auth.tsx /
                             # pages/(~39) / components/(~14) / hooks/(useTaskStream 等)
 migrations/                 # Alembic（async env + render_as_batch）
-tests/unit/                 # 31 文件（Agent 单测 + 基础设施 + 安全套件 + planner 一致性）
+tests/unit/                 # 32 文件（Agent 单测 + 基础设施 + 安全套件 + planner 一致性 + LLM 兜底）
 tests/integration/          # 1 文件（E1/E2 认证透传）
 docs/                       # 本架构文档 + 体检报告引用 + review/ 26 篇 + history/ 12 篇
 reports/                    # project_full_audit_2026-08-23.md（全面体检报告）
@@ -781,9 +793,9 @@ reports/                    # project_full_audit_2026-08-23.md（全面体检报
 
 ### 11.3 测试与文档现状
 
-- **测试**：32 个 `test_*.py`（31 单测 + 1 集成），`testpaths=["tests"]`，pytest-asyncio auto。覆盖：18 个 Agent 中约 10 个有单测；
+- **测试**：33 个 `test_*.py`（32 单测 + 1 集成），`testpaths=["tests"]`，pytest-asyncio auto。覆盖：18 个 Agent 中约 10 个有单测；
   基础设施（app_startup/auth/billing/cache/rate_limit）；安全套件（p0_security_fixes、security_boundaries、
-  s1-s4）；planner↔registry 一致性（P1-7）；E1/E2 认证透传集成测试。
+  s1-s4）；planner↔registry 一致性（P1-7）；coordinator LLM 兜底（差距 #1）；E1/E2 认证透传集成测试。
   `tests/e2e/`、`tests/performance/` 为空目录。
 - **文档**：`README.md`（模块总表 + 快速开始）、`ASCEND_README.md`、`docs/USAGE_GUIDE.md`、
   本架构文档；`docs/review/` 26 篇编号审查笔记、`docs/history/` 12 篇旧报告、
