@@ -136,7 +136,7 @@ research-agent-platform/
 ├── app/                        # 应用代码
 │   ├── agents/                 # AI Agent 模块（20+ Agent）
 │   │   ├── base.py            # Agent 基类
-│   │   ├── manifest_router.py # Agent 清单路由
+│   │   ├── registry.py        # Agent 自动注册（目录扫描，manifest 不参与运行时）
 │   │   ├── coordinator/       # 协调器（规划+调度+Agent 间结果传递）
 │   │   ├── literature/        # 文献 Agent（搜索+总结+引用）
 │   │   ├── reader/            # 论文精读 Agent
