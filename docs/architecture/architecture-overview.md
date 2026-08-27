@@ -741,8 +741,8 @@ Coordinator 页当前仅消费单 Agent 路由与静态能力表（§4.5/§6.3�
 | 3 | **"Agent 间结果传递"是硬编码字段映射**（4 组 if），非语义级传递 | `agent.py:150-167`（`_inject_upstream`） | 新增数据流需改代码；`upstream_results` 整体可见但多数下游不读 |
 | 4 | **~~compose `celery-worker` 是死引用~~（已移除，2026-08-27）**：`celery -A app.core.queue worker`，而 `app/core/queue.py` 不存在、celery 非依赖（requirements/pyproject 亦无 celery） | 原 `docker-compose.yml:40-56`，整段删除 | 顺带修正 `app/api/v1/__init__.py` docstring 的 research 路由数 19→20 |
 | 5 | **LLM 结果缓存范围很窄**：仅 `temperature==0` 且**系统凭据**调用 | `app/utils/llm.py:149,187`（`if use_cache and temperature == 0 and not user_api_key`） | 用户自带 key 不缓存（结果隔离，有意为之）；非零温度（如 literature 的关键词建议用 0.0 可缓存，但默认 `call_llm` 温度 0.7 不缓存） |
-| 6 | **`EncryptedString` 缺 Fernet 密钥时明文落库**，仅 warn 不报错 | `app/models/types.py:32-34` | 生产环境用户 LLM api_key 可能明文存储；`validate_security()` 在生产强制 Fernet 密钥（缓解项） |
-| 7 | **空目录占位**：`docs/api/`、`docs/architecture/`（本文档是首份）、`docs/deployment/`、`tests/integration/api/`、`tests/e2e/`、`tests/performance/`、`k8s/` | 目录实测 | 文档/测试矩阵名大于实：32 个测试文件 = 31 单测（`tests/unit/`）+ 1 集成（`tests/integration/`），e2e/performance 为空 |
+| 6 | **`EncryptedString` 缺 Fernet 密钥时明文落库**，仅 warn 不报错（~~生产防线不完整~~：2026-08-28 畸形密钥 fail-fast 已加） | `app/models/types.py:32-34`（明文降级点）；`config.py::validate_security` 现强制非 DEBUG 下密钥非空**且**为有效 Fernet 密钥（`Fernet(key.encode())` 构造失败即拒绝启动），堵住「配置了但写错」绕过空检查的缺口 | 生产环境两种明文落库路径（空密钥/畸形密钥）均已 fail-fast；开发态（DEBUG）明文降级仍为已知行为，仅 warn。回归测试 `tests/unit/test_config_fernet_key.py`（5 用例） |
+| 7 | **空目录占位**：`docs/api/`、`docs/architecture/`（本文档是首份）、`docs/deployment/`、`tests/integration/api/`、`tests/e2e/`、`tests/performance/`、`k8s/` | 目录实测 | 文档/测试矩阵名大于实：34 个测试文件 = 33 单测（`tests/unit/`）+ 1 集成（`tests/integration/`），e2e/performance 为空 |
 | 8 | **~~完整编排 `CoordinatorAgent.process()` 无 HTTP 入口~~（已修复，2026-08-27）**：`/coordinator/route` 只走 `process_simple`，`/workflows/{id}/run` 直调 `_execute_plan_parallel` 且不发事件，`process()` 曾仅被集成测试触达 | 新增 `POST /coordinator/orchestrate`（`api/v1/coordinator.py:65-86`，透传 `_task_id` + 用户凭据）+ 前端 Coordinator 页编排 tab（先连 WS 再发请求）；E1 认证用例已覆盖新端点 | README 宣称的主链路现已端到端接通：编排 → 事件 → WS → 前端进度条 |
 | 9 | **~~`workflow_to_execution_plan` 的"重复 agent 名"校验分支自身崩溃~~（已修复，2026-08-27）**：f-string 后误带 `(` 构成字符串调用，抛 `TypeError` 而非设计的 `ValueError` | 原 `app/core/workflows.py:180-185`；修复后 `api/v1/workflows.py:101-104` 的 `ValueError` 捕获生效 | 回归测试 `tests/unit/test_workflow_dag_validation.py`（6 用例：重复 agent/自环/循环/缺字段/正向映射）已锁定异常类型契约 |
 | 附 | **~~静态依赖表的闭包问题~~（已修复，2026-08-27）**：计划未覆盖某 Agent 的全部依赖时报"循环依赖" | `process()` 接入 `TaskPlanner.complete_upstream`（传递闭包补全缺失上游）；`_group_by_level`（`agent.py:178-207`）循环检测保留为安全网 | 回归测试 `tests/unit/test_planner_complete_upstream.py`（5 用例）+ "写论文"全链实测 `status=success`；`process_simple` 保持单 Agent 不补全 |
@@ -772,7 +772,7 @@ app/
 frontend/src/               # App.tsx(路由+守卫) / api.ts(887行) / auth.tsx /
                             # pages/(~39) / components/(~14) / hooks/(useTaskStream 等)
 migrations/                 # Alembic（async env + render_as_batch）
-tests/unit/                 # 32 文件（Agent 单测 + 基础设施 + 安全套件 + planner 一致性 + LLM 兜底）
+tests/unit/                 # 33 文件（Agent 单测 + 基础设施 + 安全套件 + planner 一致性 + LLM 兜底 + Fernet 密钥）
 tests/integration/          # 1 文件（E1/E2 认证透传）
 docs/                       # 本架构文档 + 体检报告引用 + review/ 26 篇 + history/ 12 篇
 reports/                    # project_full_audit_2026-08-23.md（全面体检报告）
@@ -793,9 +793,9 @@ reports/                    # project_full_audit_2026-08-23.md（全面体检报
 
 ### 11.3 测试与文档现状
 
-- **测试**：33 个 `test_*.py`（32 单测 + 1 集成），`testpaths=["tests"]`，pytest-asyncio auto。覆盖：18 个 Agent 中约 10 个有单测；
+- **测试**：34 个 `test_*.py`（33 单测 + 1 集成），`testpaths=["tests"]`，pytest-asyncio auto。覆盖：18 个 Agent 中约 10 个有单测；
   基础设施（app_startup/auth/billing/cache/rate_limit）；安全套件（p0_security_fixes、security_boundaries、
-  s1-s4）；planner↔registry 一致性（P1-7）；coordinator LLM 兜底（差距 #1）；E1/E2 认证透传集成测试。
+  s1-s4、config_fernet_key）；planner↔registry 一致性（P1-7）；coordinator LLM 兜底（差距 #1）；E1/E2 认证透传集成测试。
   `tests/e2e/`、`tests/performance/` 为空目录。
 - **文档**：`README.md`（模块总表 + 快速开始）、`ASCEND_README.md`、`docs/USAGE_GUIDE.md`、
   本架构文档；`docs/review/` 26 篇编号审查笔记、`docs/history/` 12 篇旧报告、

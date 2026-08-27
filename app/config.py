@@ -189,6 +189,19 @@ class Settings(BaseSettings):
                 "运行 python -c 'from cryptography.fernet import Fernet; "
                 "print(Fernet.generate_key().decode())' 生成"
             )
+        # 差距 #6：非空但畸形的密钥（Fernet 无法构造）会让 EncryptedString
+        # 静默降级为明文落库——生产环境 fail-fast，拒绝带病启动
+        if not self.DEBUG and self.API_KEY_ENCRYPTION_KEY:
+            from cryptography.fernet import Fernet
+
+            try:
+                Fernet(self.API_KEY_ENCRYPTION_KEY.encode())
+            except Exception as e:
+                raise RuntimeError(
+                    f"API_KEY_ENCRYPTION_KEY 不是有效的 Fernet 密钥: {e}；"
+                    "运行 python -c 'from cryptography.fernet import Fernet; "
+                    "print(Fernet.generate_key().decode())' 生成"
+                ) from e
 
 
 @lru_cache
