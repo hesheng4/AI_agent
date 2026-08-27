@@ -1,4 +1,4 @@
-"""Coordinator API endpoints — 能力地图 + 工作流模板 + 意图路由"""
+"""Coordinator API endpoints — 能力地图 + 工作流模板 + 意图路由 + 多 Agent 编排"""
 
 from typing import Any
 
@@ -16,6 +16,20 @@ _agent = get_coordinator_agent()
 class RouteRequest(BaseModel):
     task: str = Field(default="", description="自然语言意图，用于识别目标 agent")
     content: str = Field(default="")
+
+
+class OrchestrateRequest(RouteRequest):
+    task_id: str | None = Field(
+        default=None,
+        description="任务 ID。传入则事件发布到该 id（供前端先建 WS 连接再发起编排）；"
+        "缺省由协调器生成并在响应 task_id 中返回",
+    )
+
+
+class OrchestrateResponse(BaseModel):
+    task_id: str
+    trace_id: str
+    result: dict[str, Any]
 
 
 class RouteResponse(BaseModel):
@@ -46,3 +60,27 @@ async def route_request(req: RouteRequest, user: User = Depends(get_current_user
         }
     )
     return RouteResponse(result=result)
+
+
+@router.post("/orchestrate", response_model=OrchestrateResponse)
+async def orchestrate_request(
+    req: OrchestrateRequest, user: User = Depends(get_current_user)
+):
+    """多 Agent 编排 — 完整 process()：关键词规划 + 上游补全 + 拓扑分层并行
+
+    与 /route（单 Agent）互补。执行期间事件发布到 task_id 对应的
+    event_bus 队列，前端可先连 /ws/tasks/{task_id} 观察实时进度；
+    响应同时携带最终结果（双通道）。
+    """
+    final = await _agent.process(
+        {
+            **req.model_dump(exclude={"task_id"}),
+            "_task_id": req.task_id,
+            "_user_api_key": user.api_key,
+            "_user_api_base_url": user.api_base_url,
+            "_user_api_model": user.api_model,
+        }
+    )
+    return OrchestrateResponse(
+        task_id=final["task_id"], trace_id=final["trace_id"], result=final
+    )

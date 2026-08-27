@@ -9,6 +9,7 @@ import type {
   DesignRequest, DesignResponse, PowerAnalysisRequest, PowerAnalysisResponse,
   UsageResponse,
   RouteResponse,
+  OrchestrateResponse,
   ReadFullRequest, ReadFullResponse,
   AssessRequest, AssessResponse, QuickCheckRequest, QuickCheckResponse,
   DraftResponseRequest, DraftResponseResult, AuditResponseRequest, AuditResponseResult,
@@ -653,6 +654,13 @@ export const coordinatorApi = {
     request<RouteResponse>('/coordinator/route', {
       method: 'POST',
       body: JSON.stringify({ task, content }),
+    }),
+  /** 多 Agent 编排（完整 process()）。task_id 传入则事件发布到该 id，
+   *  供调用方先建立 /ws/tasks/{task_id} 连接再发起请求。 */
+  orchestrate: (task: string, content = '', taskId?: string) =>
+    request<OrchestrateResponse>('/coordinator/orchestrate', {
+      method: 'POST',
+      body: JSON.stringify({ task, content, ...(taskId ? { task_id: taskId } : {}) }),
     }),
 };
 

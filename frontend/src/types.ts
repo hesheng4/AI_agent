@@ -219,6 +219,12 @@ export interface RouteResponse {
   result: Record<string, unknown>;
 }
 
+export interface OrchestrateResponse {
+  task_id: string;
+  trace_id: string;
+  result: Record<string, unknown>;
+}
+
 // ===== 精读 =====
 export interface ReadFullRequest {
   content: string;

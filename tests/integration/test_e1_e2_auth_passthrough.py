@@ -21,6 +21,7 @@ from app.agents.coordinator import get_coordinator_agent
 # include_router call (Q6 fix: collapsed doubled prefix).
 _AUTHED_ENDPOINTS = [
     ("POST", "/api/v1/coordinator/route"),
+    ("POST", "/api/v1/coordinator/orchestrate"),
     ("POST", "/api/v1/cover/"),
     ("POST", "/api/v1/citation/add"),
     ("POST", "/api/v1/methods/"),

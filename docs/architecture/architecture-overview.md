@@ -98,7 +98,7 @@
 
 | 域 | 路由数 | 前缀/内容 | 限流 |
 |---|---|---|---|
-| `research/` | 20 | `/literature /citation /reader /writing /polishing /stats /methods /figure /data /reviewer /response /review-loop /cover /submission-package /paper2ppt /paper-to-patent /experiment /data-availability /export /coordinator`（`research/__init__.py` 的 docstring 仍写 19，属旧注释） | **统一** `Depends(enforce_api_rate_limit)`（套餐限流，内含认证） |
+| `research/` | 21 | `/literature /citation /reader /writing /polishing /stats /methods /figure /data /reviewer /response /review-loop /cover /submission-package /paper2ppt /paper-to-patent /experiment /data-availability /export /coordinator`（coordinator 含 4 端点：capability-map / workflow-templates / route / orchestrate） | **统一** `Depends(enforce_api_rate_limit)`（套餐限流，内含认证） |
 | `library_domain/` | 1 | `/library`（收藏/分类/标签/引用/笔记/统计 6+ 子端点） | 认证 |
 | `platform/` | 5 | `/auth /billing /agents`（AI 生成新 Agent）`/workflows`（用户 DAG）`/ws`（WebSocket） | 按端点 |
 | `ascend_domain/` | 9 | `/ascend /adaptation /alignment /profiling /perf-tuning /toolchain /validator /history-to-skill /debugging` | 按端点 |
@@ -372,8 +372,8 @@ analyze_evidence`（L283-351）、`_handle_cite / _handle_export`（L353-392，�
 
 ### 4.2 分解与依赖：静态表，不是分析
 
-- `decompose_task`（L335-341）：**每个命中 Agent 一个子任务，请求原样共享**（同一 request dict 被引用进所有子任务）；
-- `analyze_dependencies`（L343-351）：查 `AGENT_DEPENDENCIES`（L278-286）7 条静态依赖：
+- `decompose_task`（L355-361）：**每个命中 Agent 一个子任务，请求原样共享**（同一 request dict 被引用进所有子任务）；
+- `analyze_dependencies`（L363-371）：查 `AGENT_DEPENDENCIES`（L278-286）7 条静态依赖：
 
 ```python
 AGENT_DEPENDENCIES = {
@@ -392,23 +392,25 @@ AGENT_DEPENDENCIES = {
 
 ### 4.3 并行调度：拓扑分层 + 层内 gather
 
-`_execute_plan_parallel`（`agent.py:88-133`）：
+`_execute_plan_parallel`（`agent.py:93-138`）：
 
-1. `_group_by_level`（L173-202）：Kahn 式逐层取"依赖已全部完成的子任务"。
-   **边界行为（已实测）**：若某 Agent 的依赖不在本次计划中（如用户只说"写论文"，命中 `writing`，
-   但其依赖 `literature`/`reader` 未命中），该 Agent 永远进不了任何层 → 循环检测分支触发，
-   抛 `AgentException: 任务存在循环依赖，涉及Agent: ['writing']`。日志里它被记为"循环依赖"，
-   实质是**依赖表与命中集合的闭包不完整**。只有当用户话术恰好覆盖全部上游时（如"文献检索、阅读理解、写作"）
-   才能正常分层：`[['literature', 'reader'], ['writing']]`。
-2. 逐层执行：层内 `asyncio.gather(*tasks, return_exceptions=True)`（L114）——**单任务失败不炸整层**，
-   记为 `{"status": "failed"}` 继续；只有成功的结果进入 `context`（L110-111, L129-130），
+1. `_group_by_level`（L178-207）：Kahn 式逐层取"依赖已全部完成的子任务"。
+   **闭包问题已修复（2026-08-27）**：此前若某 Agent 的依赖不在本次计划中（如用户只说
+   "写论文"只命中 `writing`，`literature`/`reader` 缺失），该 Agent 永远进不了任何层，
+   循环检测分支误报"循环依赖"（实测必抛）。现在 `process()` 在 `identify_agents` 之后先调
+   `TaskPlanner.complete_upstream`（planner.py，对 `AGENT_DEPENDENCIES` 求传递闭包）把缺失
+   上游补进计划再分层——"写论文"自动扩展为 `literature + reader + writing`（回归测试
+   `tests/unit/test_planner_complete_upstream.py`）。`_group_by_level` 的循环检测保留为
+   真正循环依赖的安全网；`process_simple`（单 Agent 语义）刻意不补全。
+2. 逐层执行：层内 `asyncio.gather(*tasks, return_exceptions=True)`（L119）——**单任务失败不炸整层**，
+   记为 `{"status": "failed"}` 继续；只有成功的结果进入 `context`（L115-116, L134-135），
    下游注入时自然拿不到失败 Agent 的产物。
-3. 层内只有 1 个任务时走顺序分支（L105-108），不走 gather。
-4. 每个子任务经 `_execute_single_task`（L204-242）执行：`get_agent` 懒加载实例
+3. 层内只有 1 个任务时走顺序分支（L110-116），不走 gather。
+4. 每个子任务经 `_execute_single_task`（L209-247）执行：`get_agent` 懒加载实例
    （缓存在 `self._agent_instances`）→ `span(agent_name)` 包裹（trace 计时）→ 发布
-   `agent_start`/`agent_done` 事件（仅当 `_task_id` 存在时，L210-219）。
+   `agent_start`/`agent_done` 事件（仅当子任务携带 `_task_id` 时）。
 
-### 4.4 上游结果注入：`_inject_upstream`（L135-171）
+### 4.4 上游结果注入：`_inject_upstream`（L140-176）
 
 两层注入：
 
@@ -417,7 +419,7 @@ AGENT_DEPENDENCIES = {
 | 通用 | `request["upstream_results"] = {dep: 上游完整结果}` | 依赖表声明的所有成功上游 |
 | **硬编码字段映射** | 仅 4 组 | `literature.papers → writing.request["papers"]`；`literature.summaries → writing.request["summaries"]`；`literature.papers → data.request["papers"]`；`experiment.plan → data.request["experiment_plan"]` |
 
-字段映射只在目标字段**尚未存在**时填充（`not request.get(...)`，L153-167），
+字段映射只在目标字段**尚未存在**时填充（`not request.get(...)`，L155-172），
 即调用方显式传入优先于上游注入。映射是写死的 if 链——新增"文献→写作"式的数据流需要改这里。
 
 ### 4.5 汇总与两条对外路径
@@ -429,15 +431,14 @@ AGENT_DEPENDENCIES = {
 
 | 入口 | 调用 | 编排行为 | 事件推送 |
 |---|---|---|---|
-| `POST /coordinator/route`（`api/v1/coordinator.py:37-48`） | `process_simple`（L266-280） | **单 Agent**：取 `identify_agents` 第一个结果直接执行，不做分解/依赖/并行 | 无 |
+| `POST /coordinator/route`（`api/v1/coordinator.py:51-62`） | `process_simple`（L271-285） | **单 Agent**：取 `identify_agents` 第一个结果直接执行，不做分解/依赖/并行/补全 | 无 |
+| `POST /coordinator/orchestrate`（`api/v1/coordinator.py:65-86`，2026-08-27 新增） | **完整 `process()`**（L49-91）：规划→上游补全→分解→依赖→并行→注入→汇总 | 关键词规划的多 Agent 并行；`task_id` 可传入（前端先建 WS 再发请求） | **有**（start/planned/agent_start/agent_done/done） |
 | `POST /workflows/{id}/run`（`api/v1/workflows.py:93-116`） | 直调 `_execute_plan_parallel` + `_integrate_results` | 用户自定义 DAG（显式 edges，无静态表），执行前注入用户 API 配置 | 无（plan 未注入 `_task_id`） |
-| `CoordinatorAgent.process()`（L49-86） | 完整链：规划→分解→依赖→并行→注入→汇总 | 关键词规划的多 Agent 并行 | **有**（start/planned/agent_start/agent_done/done） |
 
-⚠️ **完整编排 `process()` 当前没有任何 HTTP 端点调用**——它只被集成测试
-（`tests/integration/test_e1_e2_auth_passthrough.py:133`）触达。README 宣传的
-"智能路由 + 并行执行 + 实时事件流"这条主链路在 HTTP 层是休眠状态：
-`/coordinator/route` 是单 Agent 路由，`/workflows/run` 走用户 DAG 但同步返回且不发事件。
-（已列入第 10 章差距 #8。）
+历史备注（2026-08-27 修复前）：完整编排 `process()` 曾**没有任何 HTTP 端点调用**，只被
+集成测试触达，README 宣传的"多 Agent 并行 + 实时事件流"主链路在 HTTP 层休眠（第 10 章
+差距 #8）。现已由 `/coordinator/orchestrate` 接通，前端 Coordinator 页"多 Agent 编排"
+tab 走 先连 WS → 再发请求 的双通道模式（§6.3）。
 
 `GET /coordinator/capability-map` 与 `GET /coordinator/workflow-templates` 只返回
 `CAPABILITY_MAP` / `WORKFLOW_TEMPLATES` 静态数据（`api/v1/coordinator.py:25-34`），供前端展示能力清单。
@@ -521,15 +522,16 @@ flowchart LR
 
 ### 5.2 一次完整编排的层级推演
 
-以"文献检索、阅读理解、写作、模拟审稿"为例（话术需覆盖全部上游依赖，否则触发 §4.3 的闭包问题）：
+以"写论文、模拟审稿"为例（闭包修复后无需把上游说全：`identify_agents` 命中
+`writing + reviewer`，`complete_upstream` 自动补出 `literature/reader/stats/methods`）：
 
 | 层 | 并行执行 | 说明 |
 |---|---|---|
-| L1 | literature ∥ reader | 无依赖；literature 先打 Semantic Scholar/arXiv 再 LLM 摘要 |
+| L1 | literature ∥ reader ∥ stats ∥ methods | 无依赖；literature 先打 Semantic Scholar/arXiv 再 LLM 摘要 |
 | L2 | writing | 收 `papers`/`summaries` 注入，temp=0.0 生成（可命中 LLM 缓存） |
 | L3 | reviewer | 读 `upstream_results[writing]` 做模拟审稿 |
 
-`stats`/`methods` 若同时命中会**与 literature 同在 L1 并行**（它们无上游声明）——
+注意 `stats`/`methods` 与 literature **同在 L1 并行**（它们无上游声明）——
 依赖表表达的是"审稿需要三者"而非"统计需要写作完成"，这是当前模型的表达力边界。
 
 ### 5.3 投稿与修稿两条支线
@@ -572,13 +574,17 @@ flowchart LR
 
 ### 6.3 前端消费（frontend/src/hooks/useTaskStream.ts）
 
-`useTaskStream(taskId, enabled)`：按 `location.protocol` 选 ws/wss 拼
-`/api/v1/ws/tasks/{taskId}?token=`，`onmessage` 累积 `events`、按 `agent_start/agent_done`
-维护 `agents` 进度状态、`done` 置终态。taskId 来源：coordinator 返回或前端生成
-（hook 注释 L27）。页面侧（如 Coordinator.tsx）目前只用了 `coordinatorApi.route /
-capabilityMap / workflowTemplates` 三个 HTTP 接口——与 §4.5 的事实一致：
-**事件流链路（后端发布 → WS 推送 → 前端渲染）完整存在，但触发它的编排入口（完整
-`process()`）尚未接 HTTP**。
+`useTaskStream(taskId, enabled, onOpen?)`：按 `location.protocol` 选 ws/wss 拼
+`/api/v1/ws/tasks/{taskId}?token=`，`onmessage` 累积 `events`、`planned` 事件填
+`plannedAgents`（计划步骤清单）、按 `agent_start/agent_done` 维护 `agents` 进度、
+`done` 置终态；`onOpen` 回调在连接建立时触发（2026-08-27 增加）。
+
+页面侧 Coordinator.tsx 的"多 Agent 编排"tab（2026-08-27 新增）是事件流链路的
+首个完整消费者：前端生成 `taskId`（`crypto.randomUUID`）→ 设给 hook 建 WS 连接 →
+`onOpen` 触发后（或 800ms 兜底超时后）才调 `coordinatorApi.orchestrate(task, '', taskId)`
+→ 后端事件从 `start` 起全部可被收到，进度条按计划步骤实时点亮；最终结果同时经
+HTTP 响应返回（双通道）。此前该页只用 route/capabilityMap/workflowTemplates 三个
+HTTP 接口，WS 链路虽完整但无触发者（§4.5）。
 
 ### 6.4 全链路图
 
@@ -725,9 +731,9 @@ Coordinator 页当前仅消费单 Agent 路由与静态能力表（§4.5/§6.3�
 | 5 | **LLM 结果缓存范围很窄**：仅 `temperature==0` 且**系统凭据**调用 | `app/utils/llm.py:149,187`（`if use_cache and temperature == 0 and not user_api_key`） | 用户自带 key 不缓存（结果隔离，有意为之）；非零温度（如 literature 的关键词建议用 0.0 可缓存，但默认 `call_llm` 温度 0.7 不缓存） |
 | 6 | **`EncryptedString` 缺 Fernet 密钥时明文落库**，仅 warn 不报错 | `app/models/types.py:32-34` | 生产环境用户 LLM api_key 可能明文存储；`validate_security()` 在生产强制 Fernet 密钥（缓解项） |
 | 7 | **空目录占位**：`docs/api/`、`docs/architecture/`（本文档是首份）、`docs/deployment/`、`tests/integration/api/`、`tests/e2e/`、`tests/performance/`、`k8s/` | 目录实测 | 文档/测试矩阵名大于实：32 个测试文件 = 31 单测（`tests/unit/`）+ 1 集成（`tests/integration/`），e2e/performance 为空 |
-| 8 | **完整编排 `CoordinatorAgent.process()` 无 HTTP 入口**（本次分析新发现） | `/coordinator/route` 只走 `process_simple`（`api/v1/coordinator.py:37-48`）；`/workflows/{id}/run` 直调 `_execute_plan_parallel` 且不发事件（`api/v1/workflows.py:114`）；`process()` 仅被 `tests/integration/test_e1_e2_auth_passthrough.py:133` 触达 | README 宣传的"多 Agent 并行 + 实时事件流"主链路在 HTTP 层休眠：多 Agent 编排与 WS 进度条目前只有测试能触发 |
+| 8 | **~~完整编排 `CoordinatorAgent.process()` 无 HTTP 入口~~（已修复，2026-08-27）**：`/coordinator/route` 只走 `process_simple`，`/workflows/{id}/run` 直调 `_execute_plan_parallel` 且不发事件，`process()` 曾仅被集成测试触达 | 新增 `POST /coordinator/orchestrate`（`api/v1/coordinator.py:65-86`，透传 `_task_id` + 用户凭据）+ 前端 Coordinator 页编排 tab（先连 WS 再发请求）；E1 认证用例已覆盖新端点 | README 宣称的主链路现已端到端接通：编排 → 事件 → WS → 前端进度条 |
 | 9 | **~~`workflow_to_execution_plan` 的"重复 agent 名"校验分支自身崩溃~~（已修复，2026-08-27）**：f-string 后误带 `(` 构成字符串调用，抛 `TypeError` 而非设计的 `ValueError` | 原 `app/core/workflows.py:180-185`；修复后 `api/v1/workflows.py:101-104` 的 `ValueError` 捕获生效 | 回归测试 `tests/unit/test_workflow_dag_validation.py`（6 用例：重复 agent/自环/循环/缺字段/正向映射）已锁定异常类型契约 |
-| 附 | **静态依赖表的闭包问题**（§4.3）：计划未覆盖某 Agent 的全部依赖时报"循环依赖" | `_group_by_level`（`agent.py:190-195`）循环分支；"写论文"单 Agent 任务实测必抛 | 话术需恰好命中全部上游（如"文献检索、阅读理解、写作"）才能走多 Agent 并行 |
+| 附 | **~~静态依赖表的闭包问题~~（已修复，2026-08-27）**：计划未覆盖某 Agent 的全部依赖时报"循环依赖" | `process()` 接入 `TaskPlanner.complete_upstream`（传递闭包补全缺失上游）；`_group_by_level`（`agent.py:178-207`）循环检测保留为安全网 | 回归测试 `tests/unit/test_planner_complete_upstream.py`（5 用例）+ "写论文"全链实测 `status=success`；`process_simple` 保持单 Agent 不补全 |
 
 ---
 
@@ -744,7 +750,7 @@ app/
 │   └── <name>/             # agent.py + prompts.py + tools.py? + manifest.yaml + SKILL.md
 ├── api/
 │   ├── deps.py             # get_current_user / enforce_api_rate_limit
-│   └── v1/                 # 4 域聚合：research(20) / library(1) / platform(5) / ascend_domain(9)
+│   └── v1/                 # 4 域聚合：research(21) / library(1) / platform(5) / ascend_domain(9)
 ├── core/                   # cache / rate_limit / security / billing / vector_store /
 │                           # events / tracing / workflows / ascend + 9 个昇腾工作台模块
 ├── models/                 # user / billing / library / types(EncryptedString)

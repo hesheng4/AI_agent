@@ -61,6 +61,11 @@ class CoordinatorAgent(BaseAgent):
             )
 
             agents_needed = self.planner.identify_agents(request)
+            # 补全缺失上游（静态依赖表闭包不完整会误报循环依赖）
+            completed = self.planner.complete_upstream(agents_needed)
+            if completed != agents_needed:
+                logger.info(f"自动补全上游Agents: {agents_needed} -> {completed}")
+                agents_needed = completed
             logger.info(f"需要的Agents: {agents_needed}")
             await event_bus.publish(
                 task_id, {"type": "planned", "agents": agents_needed}

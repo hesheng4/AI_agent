@@ -1,11 +1,13 @@
-// 协调器页 — 能力地图 · 工作流模板 · 智能路由
-import { useState, useEffect, type FormEvent } from 'react';
+// 协调器页 — 能力地图 · 工作流模板 · 智能路由 · 多 Agent 编排
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader, Button, Card, Input, Loading, EmptyState, ErrorBanner } from '../components/ui';
 import { coordinatorApi } from '../api';
+import { useTaskStream } from '../hooks/useTaskStream';
+import type { OrchestrateResponse } from '../types';
 
-type TabKey = 'route' | 'capabilities' | 'workflows';
+type TabKey = 'route' | 'capabilities' | 'workflows' | 'orchestrate';
 
 const ROUTE_SUGGESTIONS = [
   { label: '文献检索', task: '搜索关于大语言模型的最新论文', icon: 'fa-search' },
@@ -49,6 +51,59 @@ export default function Coordinator() {
   const [workflows, setWorkflows] = useState<Array<{ id: string; name: string; description: string; steps: string[] }>>([]);
   const [wfLoading, setWfLoading] = useState(false);
   const [wfError, setWfError] = useState('');
+
+  // 编排 tab — 先连 WS（/ws/tasks/{taskId}）再发编排请求，避免错过 start/planned 事件
+  const [orchInput, setOrchInput] = useState('');
+  const [orchTaskId, setOrchTaskId] = useState<string | null>(null);
+  const [orchResult, setOrchResult] = useState<OrchestrateResponse | null>(null);
+  const [orchLoading, setOrchLoading] = useState(false);
+  const [orchError, setOrchError] = useState('');
+  const [orchWsReady, setOrchWsReady] = useState(false);
+  const orchPending = useRef<{ task: string; gen: number } | null>(null);
+  const orchGen = useRef(0);
+
+  const orchStream = useTaskStream(orchTaskId, !!orchTaskId, () => {
+    setOrchWsReady(true);
+    const p = orchPending.current;
+    if (p && p.gen === orchGen.current && orchTaskId) {
+      orchPending.current = null;
+      void runOrchestrate(p.task, orchTaskId);
+    }
+  });
+
+  async function runOrchestrate(task: string, taskId: string) {
+    try {
+      const res = await coordinatorApi.orchestrate(task, '', taskId);
+      setOrchResult(res);
+    } catch (err) {
+      setOrchError(err instanceof Error ? err.message : '编排失败');
+    } finally {
+      setOrchLoading(false);
+    }
+  }
+
+  function handleOrchestrate(e: FormEvent) {
+    e.preventDefault();
+    const task = orchInput.trim();
+    if (!task) return;
+    setOrchError('');
+    setOrchResult(null);
+    setOrchLoading(true);
+    setOrchWsReady(false);
+    orchGen.current += 1;
+    const gen = orchGen.current;
+    const taskId = crypto.randomUUID();
+    orchPending.current = { task, gen };
+    setOrchTaskId(taskId);
+    // 兜底：WS 800ms 内未建立（如 token 缺失）则直接发请求，避免卡死
+    setTimeout(() => {
+      const p = orchPending.current;
+      if (p && p.gen === gen) {
+        orchPending.current = null;
+        void runOrchestrate(p.task, taskId);
+      }
+    }, 800);
+  }
 
   useEffect(() => {
     if (tab === 'capabilities' && capabilities.length === 0) loadCapabilities();
@@ -165,7 +220,7 @@ export default function Coordinator() {
     <div>
       <PageHeader
         title="智能协调器"
-        subtitle="能力地图 · 工作流模板 · 意图路由"
+        subtitle="能力地图 · 工作流模板 · 意图路由 · 多 Agent 编排"
         icon="fa-route"
       />
 
@@ -174,6 +229,7 @@ export default function Coordinator() {
           { key: 'route' as TabKey, label: '智能路由', icon: 'fa-route' },
           { key: 'capabilities' as TabKey, label: '能力地图', icon: 'fa-map' },
           { key: 'workflows' as TabKey, label: '工作流模板', icon: 'fa-diagram-project' },
+          { key: 'orchestrate' as TabKey, label: '多 Agent 编排', icon: 'fa-sitemap' },
         ]).map(t => (
           <button
             key={t.key}
@@ -233,6 +289,119 @@ export default function Coordinator() {
           {routeError && <div className="mb-4"><ErrorBanner message={routeError} /></div>}
           {routeLoading && <Loading text="分析意图，路由中..." />}
           {renderRouteResult()}
+        </motion.div>
+      )}
+
+      {/* 多 Agent 编排 Tab */}
+      {tab === 'orchestrate' && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          <Card className="mb-6">
+            <form onSubmit={handleOrchestrate} className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex-1">
+                <Input
+                  icon="fa-sitemap"
+                  placeholder="描述端到端需求，系统自动规划并并行执行（如：检索文献、精读、写论文）..."
+                  value={orchInput}
+                  onChange={e => setOrchInput(e.target.value)}
+                  className="h-12 text-base"
+                />
+              </div>
+              <Button type="submit" loading={orchLoading} className="h-12 shrink-0 sm:px-8">
+                <i className="fas fa-sitemap mr-1.5" />
+                编排
+              </Button>
+            </form>
+          </Card>
+
+          {orchError && <div className="mb-4"><ErrorBanner message={orchError} /></div>}
+
+          {orchTaskId && (
+            <Card className="mb-6">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-serif text-sm text-ink-bg">执行进度</h3>
+                <span className={`text-[11px] ${orchWsReady ? 'text-emerald-500' : 'text-amber-500'}`}>
+                  {orchWsReady ? '实时通道已连接' : '正在连接实时通道...'}
+                </span>
+              </div>
+
+              {orchStream.plannedAgents.length > 0 ? (
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  {orchStream.plannedAgents.map((name, i) => {
+                    const done = orchStream.agents.includes(name);
+                    const current = orchStream.currentAgent === name;
+                    return (
+                      <span key={name} className="flex items-center gap-1">
+                        {i > 0 && <i className="fas fa-chevron-right text-[8px] text-ink-bg/20" />}
+                        <span
+                          className={`rounded px-2 py-1 text-[11px] ${
+                            done
+                              ? 'bg-emerald-500/10 text-emerald-500'
+                              : current
+                                ? 'animate-pulse bg-copper/15 text-copper-light'
+                                : 'bg-copper/10 text-ink-bg/40'
+                          }`}
+                        >
+                          {done && <i className="fas fa-check mr-1" />}
+                          {name}
+                        </span>
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mb-3 text-xs text-ink-bg/50">
+                  {orchLoading ? '正在规划任务，等待执行计划...' : '等待编排启动...'}
+                </p>
+              )}
+
+              {orchStream.events.length > 0 && (
+                <details open>
+                  <summary className="cursor-pointer text-xs text-ink-bg/60">
+                    事件流（{orchStream.events.length}）
+                  </summary>
+                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-ink-dark/60 p-3 text-[11px] leading-5 text-ink-bg/70">
+                    {orchStream.events.slice(-30).map((ev, i) => (
+                      <div key={i}>
+                        {ev.type}
+                        {ev.agent ? ` [${ev.agent}]` : ''}
+                        {ev.status ? ` status=${ev.status}` : ''}
+                      </div>
+                    ))}
+                  </pre>
+                </details>
+              )}
+            </Card>
+          )}
+
+          {orchResult && (
+            <Card>
+              {(() => {
+                const status = (orchResult.result.status as string) ?? '';
+                const agentsUsed = (orchResult.result.agents_used as string[] | undefined) ?? [];
+                const ok = status === 'success';
+                return (
+                  <>
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <i className={`fas ${ok ? 'fa-circle-check text-emerald-500' : 'fa-circle-exclamation text-amber-500'}`} />
+                      <h3 className="font-serif text-sm text-ink-bg">
+                        {ok ? '编排完成' : '编排完成（部分失败）'}
+                      </h3>
+                      <span className="text-[10px] text-ink-bg/40">task_id: {orchResult.task_id}</span>
+                    </div>
+                    {agentsUsed.length > 0 && (
+                      <p className="mb-3 text-xs text-ink-bg/60">参与 Agent：{agentsUsed.join(' → ')}</p>
+                    )}
+                    <details>
+                      <summary className="cursor-pointer text-xs text-ink-bg/60">查看完整结果</summary>
+                      <pre className="mt-2 max-h-96 overflow-auto rounded-lg bg-ink-dark/60 p-3 text-xs text-ink-bg/70">
+                        {JSON.stringify(orchResult.result, null, 2)}
+                      </pre>
+                    </details>
+                  </>
+                );
+              })()}
+            </Card>
+          )}
         </motion.div>
       )}
 

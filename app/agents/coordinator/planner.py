@@ -332,6 +332,26 @@ class TaskPlanner:
             agents.append(agent_name)
         return list(dict.fromkeys(agents))
 
+    def complete_upstream(self, agents: list[str]) -> list[str]:
+        """补全缺失的上游 Agent — 对 AGENT_DEPENDENCIES 求传递闭包
+
+        静态依赖表只表达「谁依赖谁」，而调度要求依赖闭包完整：
+        用户只说「写论文」时 identify_agents 只命中 writing，但
+        _group_by_level 发现其依赖 literature/reader 不在计划中会
+        误报循环依赖。这里把缺失上游补进计划。
+
+        仅 process() 多 Agent 编排路径调用；process_simple 是
+        刻意的单 Agent 语义，不做补全。
+        """
+        result = list(dict.fromkeys(agents))  # 去重保序
+        queue = list(result)
+        while queue:
+            for dep in AGENT_DEPENDENCIES.get(queue.pop(0), []):
+                if dep not in result:
+                    result.append(dep)
+                    queue.append(dep)
+        return result
+
     def decompose_task(self, request: dict[str, Any], agents: list[str]) -> list[dict]:
         """分解任务"""
         subtasks = []
