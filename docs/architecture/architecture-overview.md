@@ -155,7 +155,8 @@
 | `agent_generator.py` | 自然语言 → 6 个产物（agent.py / manifest.yaml / API 路由 / React 页面 / api.ts 片段 / planner 条目） | 依赖 LLM |
 | `adaptation.py` 等 9 个 | 昇腾工作台逻辑（见第 8 章） | ascend 向 |
 
-> 注意：`docker-compose.yml` 里的 `celery-worker` 服务引用不存在的 `app.core.queue`（celery 也非依赖）——死引用，见第 10 章。
+> 注意：`docker-compose.yml` 曾含 `celery-worker` 死引用（引用不存在的 `app.core.queue`，celery 也非依赖），
+> 2026-08-27 已移除（见第 10 章差距 #4）。
 
 ---
 
@@ -696,7 +697,7 @@ Coordinator 页当前仅消费单 Agent 路由与静态能力表（§4.5/§6.3�
 | 推理 | 无（走远程 API） | `vllm-ascend`（Qwen2.5-72B-Instruct, TP4）+ `vllm-embedding`（bge-large-zh-v1.5） |
 | 应用 | `api` | `research-agent`（`LLM_MODE=ascend`） |
 | 数据 | `db`（postgres:15-alpine）、`redis:7-alpine`、`milvus`（standalone） | 同左 + `etcd:3.5.5`、`minio`、`milvus:2.3.3` + 5 个 named volume |
-| 其他 | `nginx`（production profile）、**`celery-worker`（死引用，见第 10 章）** | — |
+| 其他 | `nginx`（production profile） | — |
 
 **运维要点**：
 
@@ -720,7 +721,7 @@ Coordinator 页当前仅消费单 Agent 路由与静态能力表（§4.5/§6.3�
 | 1 | **"智能路由/coordinator"实为关键词匹配 + 静态依赖表**，规划环节零 LLM | `planner.py:5-98`（`SKILL_KEYWORD_MAP`）、`planner.py:278-286`（`AGENT_DEPENDENCIES`）；无 LLM 调用路径 | 路由质量受限于关键词表覆盖；"不要分析数据"类表述仍误路由。一致性由 `tests/unit/test_planner_registry_consistency.py` 锁定（体检报告 P1-7） |
 | 2 | **README 提到的 `manifest_router.py` 不存在**；各 Agent 目录的 `manifest.yaml`/`SKILL.md` 无任何程序解析 | 全 `app/` 435 个文件零 `yaml` import（2026-08-27 实测）；Agent 发现纯靠 `registry.py:34-79` 目录扫描 | manifest 是面向 LLM/文档的声明，不是运行时配置——改 manifest 不影响行为 |
 | 3 | **"Agent 间结果传递"是硬编码字段映射**（4 组 if），非语义级传递 | `agent.py:150-167`（`_inject_upstream`） | 新增数据流需改代码；`upstream_results` 整体可见但多数下游不读 |
-| 4 | **compose `celery-worker` 是死引用**：`celery -A app.core.queue worker`，而 `app/core/queue.py` 不存在、celery 非依赖 | `docker-compose.yml:40-44` | `docker-compose up` 该服务必然失败 |
+| 4 | **~~compose `celery-worker` 是死引用~~（已移除，2026-08-27）**：`celery -A app.core.queue worker`，而 `app/core/queue.py` 不存在、celery 非依赖（requirements/pyproject 亦无 celery） | 原 `docker-compose.yml:40-56`，整段删除 | 顺带修正 `app/api/v1/__init__.py` docstring 的 research 路由数 19→20 |
 | 5 | **LLM 结果缓存范围很窄**：仅 `temperature==0` 且**系统凭据**调用 | `app/utils/llm.py:149,187`（`if use_cache and temperature == 0 and not user_api_key`） | 用户自带 key 不缓存（结果隔离，有意为之）；非零温度（如 literature 的关键词建议用 0.0 可缓存，但默认 `call_llm` 温度 0.7 不缓存） |
 | 6 | **`EncryptedString` 缺 Fernet 密钥时明文落库**，仅 warn 不报错 | `app/models/types.py:32-34` | 生产环境用户 LLM api_key 可能明文存储；`validate_security()` 在生产强制 Fernet 密钥（缓解项） |
 | 7 | **空目录占位**：`docs/api/`、`docs/architecture/`（本文档是首份）、`docs/deployment/`、`tests/integration/api/`、`tests/e2e/`、`tests/performance/`、`k8s/` | 目录实测 | 文档/测试矩阵名大于实：32 个测试文件 = 31 单测（`tests/unit/`）+ 1 集成（`tests/integration/`），e2e/performance 为空 |

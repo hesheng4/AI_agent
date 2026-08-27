@@ -36,25 +36,6 @@ services:
     networks:
       - app-network
 
-  # Celery Worker (异步任务)
-  celery-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: celery -A app.core.queue worker --loglevel=info --concurrency=4
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/research_agent
-      - REDIS_URL=redis://redis:6379/0
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-    depends_on:
-      - api
-      - redis
-    volumes:
-      - ./logs:/app/logs
-    restart: unless-stopped
-    networks:
-      - app-network
-
   # PostgreSQL数据库
   db:
     image: postgres:15-alpine
