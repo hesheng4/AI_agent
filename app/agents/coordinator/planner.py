@@ -286,6 +286,20 @@ AGENT_DEPENDENCIES: dict[str, list[str]] = {
     "response": ["reviewer"],
 }
 
+# ── 上游结果字段级注入映射（差距 #3：声明式，替代 coordinator 的 if 链）──
+# 格式: {下游 agent: {目标字段: (上游 agent, 源字段)}}
+# 目标字段不存在（调用方未显式传入）时才填充；新增数据流 = 加一行表项。
+UPSTREAM_FIELD_MAP: dict[str, dict[str, tuple[str, str]]] = {
+    "writing": {
+        "papers": ("literature", "papers"),
+        "summaries": ("literature", "summaries"),
+    },
+    "data": {
+        "papers": ("literature", "papers"),
+        "experiment_plan": ("experiment", "plan"),
+    },
+}
+
 
 class TaskPlanner:
     """任务规划器 — 覆盖全部 16 Nature-skills"""

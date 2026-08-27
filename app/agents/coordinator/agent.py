@@ -3,7 +3,7 @@ import json
 from typing import Any
 
 from app.agents.base import BaseAgent
-from app.agents.coordinator.planner import TaskPlanner
+from app.agents.coordinator.planner import UPSTREAM_FIELD_MAP, TaskPlanner
 from app.agents.registry import get_agent_registry
 from app.core.events import event_bus
 from app.core.tracing import span, trace_context
@@ -148,7 +148,13 @@ class CoordinatorAgent(BaseAgent):
         return results
 
     def _inject_upstream(self, task: dict, context: dict[str, dict[str, Any]]) -> dict:
-        """将上游 Agent 的成功结果注入当前任务请求"""
+        """将上游 Agent 的成功结果注入当前任务请求
+
+        字段级注入走声明式映射 UPSTREAM_FIELD_MAP（差距 #3）：
+        {下游 agent: {目标字段: (上游 agent, 源字段)}}——新增数据流
+        加一行表项即可，不再改 if 链。调用方显式传入的字段优先
+        （目标字段不存在时才填充）。
+        """
         deps = task.get("dependencies", [])
         if not deps:
             return task
@@ -161,25 +167,14 @@ class CoordinatorAgent(BaseAgent):
 
         if upstream:
             request["upstream_results"] = upstream
-
-            if "literature" in upstream:
-                lit = upstream["literature"] or {}
-                if task["agent"] == "writing":
-                    if not request.get("papers") and lit.get("papers"):
-                        request["papers"] = lit["papers"]
-                    if not request.get("summaries") and lit.get("summaries"):
-                        request["summaries"] = lit["summaries"]
-                if (
-                    task["agent"] == "data"
-                    and not request.get("papers")
-                    and lit.get("papers")
-                ):
-                    request["papers"] = lit["papers"]
-
-            if "experiment" in upstream and task["agent"] == "data":
-                exp = upstream["experiment"] or {}
-                if not request.get("experiment_plan") and exp.get("plan"):
-                    request["experiment_plan"] = exp["plan"]
+            for field, (up_agent, src_field) in UPSTREAM_FIELD_MAP.get(
+                task["agent"], {}
+            ).items():
+                if request.get(field):
+                    continue  # 调用方显式传入优先
+                src = upstream.get(up_agent) or {}
+                if src.get(src_field):
+                    request[field] = src[src_field]
 
         task = dict(task)
         task["request"] = request
