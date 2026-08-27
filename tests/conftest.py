@@ -14,6 +14,25 @@ async def client():
 
 
 @pytest.fixture
+async def db_isolated_client(tmp_path):
+    """临时 sqlite 隔离客户端：重置 engine + 建表 + 进程内 ASGI 请求。
+
+    e2e / performance 测试专用——避免注册/登录用例污染开发数据库
+    （research_agent.db），测试结束恢复原 engine。
+    """
+    import app.core.database as dbmod
+
+    db_file = tmp_path / "isolated.db"
+    await dbmod.reset_engine(f"sqlite+aiosqlite:///{db_file}")
+    async with dbmod.engine.begin() as conn:
+        await conn.run_sync(dbmod.Base.metadata.create_all)
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+    await dbmod.reset_engine(None)  # 恢复 settings.DATABASE_URL
+
+
+@pytest.fixture
 def mock_user():
     """模拟用户"""
     return {"id": "test_user_123", "email": "test@example.com", "username": "测试用户"}
