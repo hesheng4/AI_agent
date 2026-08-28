@@ -43,6 +43,7 @@ ENV/
 .arts/
 .atomcode/
 .codeartsdoer/
+.codegraph/
 .workbuddy/
 .claude/
 .pwtest/
