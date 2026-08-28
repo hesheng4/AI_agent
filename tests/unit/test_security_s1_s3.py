@@ -70,24 +70,28 @@ def test_s1_garbage_token_rejected():
 
 
 @pytest.mark.asyncio
-async def test_s1_refresh_endpoint_issues_new_tokens(client):
-    """POST /auth/refresh with valid refresh token → new access + refresh pair."""
-    # Build a refresh token directly (bypass login flow which needs DB user)
-    from app.core.database import async_session
+async def test_s1_refresh_endpoint_issues_new_tokens(db_isolated_client):
+    """POST /auth/refresh with valid refresh token → new access + refresh pair.
+
+    用 db_isolated_client 显式注册用户——此前版本依赖开发库已有 users 表
+    （无用户则 skip），是隐式的环境依赖；隔离临时库后测试自包含。
+    """
+    import uuid
+
     from app.core.security import create_refresh_token
-    from app.models.user import User
 
-    # Create a user in DB for the refresh flow to find
-    async with async_session() as db:
-        from sqlalchemy import select
+    token = uuid.uuid4().hex[:10]
+    email = f"s1_{token}@example.com"
+    reg = await db_isolated_client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "username": f"u_{token}", "password": "Passw0rd!S1"},
+    )
+    assert reg.status_code == 200, reg.text
+    user_id = reg.json()["id"]
 
-        result = await db.execute(select(User).limit(1))
-        user = result.scalar_one_or_none()
-        if not user:
-            pytest.skip("no user in DB for /refresh integration test")
-
-    refresh = create_refresh_token(data={"sub": user.id, "email": user.email})
-    response = await client.post(
+    # Build a refresh token directly (bypass login flow which needs DB user)
+    refresh = create_refresh_token(data={"sub": user_id, "email": email})
+    response = await db_isolated_client.post(
         "/api/v1/auth/refresh",
         json={"refresh_token": refresh},
     )

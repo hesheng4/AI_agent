@@ -260,7 +260,6 @@ research-agent-platform/
 │   │   └── sections/
 │   │       └── Hero.tsx          # Hero 区（整合 5 个 React Bits 组件）
 │   ├── index.html            # HTML 模板
-│   ├── index_legacy.html     # 旧 Alpine.js 版本（备份）
 │   ├── package.json          # npm 依赖
 │   ├── vite.config.ts        # Vite 配置
 │   ├── tsconfig.json         # TypeScript 配置
@@ -272,11 +271,11 @@ research-agent-platform/
 │   └── versions/
 │       └── 6ab33371ef5b_initial_baseline.py  # 初始 baseline（8 表 + 10 索引）
 ├── alembic.ini                # Alembic 配置
-├── tests/                     # 测试
-│   ├── unit/                 # 单元测试
-│   ├── integration/          # 集成测试
-│   ├── e2e/                  # 端到端测试
-│   ├── performance/          # 性能测试
+├── tests/                     # 测试（47 文件 / 479 用例）
+│   ├── unit/                 # 单元测试（44 文件，18 Agent 全覆盖）
+│   ├── integration/          # 集成测试（1 文件：E1/E2 认证透传）
+│   ├── e2e/                  # 端到端测试（1 文件：认证全链路，临时 sqlite 隔离）
+│   ├── performance/          # 性能测试（1 文件：延迟冒烟，宽松预算）
 │   └── alignment/            # 精度对齐测试数据
 ├── scripts/                   # 脚本
 │   ├── deploy.sh             # 部署脚本
@@ -796,6 +795,8 @@ MIT License
 每个技能含独立的 `SKILL.md` 定义与参考文档，`_shared/` 提供共享资源。详见 [nature-skills/README.md](file:///d:/AI_agent/nature-skills/README.md)。
 
 ## 架构亮点
+
+> 完整架构（11 章 + 3 张 Mermaid 图 + 差距清单）见 [docs/architecture/architecture-overview.md](docs/architecture/architecture-overview.md)。
 
 ### 统一 LibraryService（痛点 1 完整状态同步）
 
