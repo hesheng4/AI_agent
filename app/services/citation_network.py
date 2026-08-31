@@ -307,16 +307,23 @@ class CitationNetwork:
         """共被引分析 - 两篇论文同时被引用的频率
 
         如果论文A和B经常被同一篇论文引用，说明它们在研究主题上密切相关。
+
+        算法：对每篇施引文献 X，把 X 的参考文献集合 adjacency[X] 中的
+        文献两两配对。得到的节点对是**被引文献**之间的关系。
+
+        修复说明（P0-6）：此前遍历的是 reverse_adj（被引 -> 施引集合），
+        对被引文献的施引者两两配对，算出的实际是文献耦合，与本函数语义
+        正好相反。
         """
         co_citation_counts: dict[tuple[str, str], int] = defaultdict(int)
 
-        # 遍历每篇引用论文，统计共被引对
-        for citing_id in self.reverse_adj:
-            cited_ids = list(self.reverse_adj[citing_id])
+        # 遍历每篇施引文献，统计其参考文献两两组成的共被引对
+        for citing_id in self.adjacency:
+            cited_ids = sorted(self.adjacency[citing_id])
             # 对于每对被引论文
             for i in range(len(cited_ids)):
                 for j in range(i + 1, len(cited_ids)):
-                    pair = tuple(sorted([cited_ids[i], cited_ids[j]]))
+                    pair = (cited_ids[i], cited_ids[j])
                     co_citation_counts[pair] += 1
 
         # 筛选和排序
@@ -373,23 +380,23 @@ class CitationNetwork:
         """文献耦合分析 - 两篇论文引用相同文献的数量
 
         如果论文A和B引用了大量相同的参考文献，说明它们研究主题相近。
+
+        算法：对每篇被引文献 Z，把引用 Z 的施引文献集合 reverse_adj[Z]
+        两两配对。得到的节点对是**施引文献**之间的关系。
+
+        修复说明（P0-6/P0-7）：此前遍历 adjacency（施引 -> 被引集合），
+        算出的实际是共被引，与本函数语义相反；且把 reverse_adj[cited] 与
+        adjacency[cited] 取并集，在一般引用图上（一篇文献通常既施引又被
+        引用）会把"引用它的"与"它引用的"混入同一集合，产出无意义配对。
         """
         coupling_counts: dict[tuple[str, str], int] = defaultdict(int)
 
-        # 遍历每篇被引论文，统计引用它的论文对
-        for cited_id in self.adjacency:
-            # 同时被引（共引）的论文：既在出边引用它，也被它引用的论文集合
-            # adjacency[cited_id] 是 cited_id 引用的论文；
-            # reverse_adj[cited_id] 是引用 cited_id 的论文
-            # 文献耦合关注"引用了同一篇参考文献的论文对"，
-            # 即 reverse_adj[cited_id] 中的两两组合
-            citing_of_ref = list(
-                self.reverse_adj.get(cited_id, set())
-                | self.adjacency.get(cited_id, set())
-            )
-            for i in range(len(citing_of_ref)):
-                for j in range(i + 1, len(citing_of_ref)):
-                    pair = tuple(sorted([citing_of_ref[i], citing_of_ref[j]]))
+        # 遍历每篇被引文献，统计引用它的施引文献两两组成的耦合对
+        for cited_id in self.reverse_adj:
+            citing_ids = sorted(self.reverse_adj[cited_id])
+            for i in range(len(citing_ids)):
+                for j in range(i + 1, len(citing_ids)):
+                    pair = (citing_ids[i], citing_ids[j])
                     coupling_counts[pair] += 1
 
         # 筛选和排序

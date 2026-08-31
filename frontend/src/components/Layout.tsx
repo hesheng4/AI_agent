@@ -153,7 +153,7 @@ export default function Layout({ children }: { children?: ReactNode }) {
               <BrandLogo size={30} />
               <div className="hidden sm:block">
                 <div className="font-serif text-sm font-semibold tracking-wide text-[#E0C896]">墨观</div>
-                <div className="font-mono text-[9px] tracking-[0.2em] text-[rgba(201,169,97,0.5)] uppercase">学术天文台</div>
+                <div className="font-mono text-[9px] tracking-[0.2em] text-[rgba(201,169,97,0.72)] uppercase">学术天文台</div>
               </div>
             </NavLink>
 
@@ -167,7 +167,7 @@ export default function Layout({ children }: { children?: ReactNode }) {
                   className={`rounded-md px-3 py-1.5 font-mono text-xs tracking-wider uppercase transition-all ${
                     activeGroup === g.id && navPanelOpen
                       ? 'bg-black text-[#E0C896]'
-                      : 'text-[rgba(232,228,220,0.5)] hover:bg-black/60 hover:text-[#E0C896]'
+                      : 'text-[rgba(232,228,220,0.55)] hover:bg-black/60 hover:text-[#E0C896]'
                   }`}
                 >
                   {g.title}
@@ -180,7 +180,7 @@ export default function Layout({ children }: { children?: ReactNode }) {
                   `rounded-md px-3 py-1.5 font-mono text-xs tracking-wider uppercase transition-all ${
                     isActive
                       ? 'bg-black text-[#E0C896]'
-                      : 'text-[rgba(232,228,220,0.5)] hover:bg-black/60 hover:text-[#E0C896]'
+                      : 'text-[rgba(232,228,220,0.55)] hover:bg-black/60 hover:text-[#E0C896]'
                   }`
                 }
               >
@@ -198,15 +198,15 @@ export default function Layout({ children }: { children?: ReactNode }) {
             >
               <i className="fas fa-search" />
               <span className="hidden sm:inline">搜索</span>
-              <kbd className="hidden rounded border border-[rgba(201,169,97,0.2)] bg-[rgba(201,169,97,0.05)] px-1 py-0.5 font-mono text-[9px] text-[rgba(201,169,97,0.6)] sm:inline">
+              <kbd className="hidden rounded border border-[rgba(201,169,97,0.2)] bg-[rgba(201,169,97,0.05)] px-1 py-0.5 font-mono text-[9px] text-[rgba(201,169,97,0.72)] sm:inline">
                 ⌘K
               </kbd>
             </button>
 
             {/* 当前页面面包屑（中屏以上） */}
             <div className="hidden items-center gap-2 text-xs lg:flex">
-              <span className="font-mono text-[10px] tracking-wider text-[rgba(201,169,97,0.4)] uppercase">{currentRoute.group}</span>
-              <i className="fas fa-chevron-right text-[8px] text-[rgba(201,169,97,0.3)]" />
+              <span className="font-mono text-[10px] tracking-wider text-[rgba(201,169,97,0.72)] uppercase">{currentRoute.group}</span>
+              <i className="fas fa-chevron-right text-[8px] text-[rgba(201,169,97,0.55)]" />
               <span className="font-medium text-[#E0C896]">{currentRoute.title}</span>
             </div>
 
@@ -224,7 +224,7 @@ export default function Layout({ children }: { children?: ReactNode }) {
                   )}
                 </div>
                 <span className="hidden text-sm text-[#E8E4DC] sm:inline">{user?.username}</span>
-                <i className={`fas fa-chevron-down text-[10px] text-[rgba(201,169,97,0.5)] transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />
+                <i className={`fas fa-chevron-down text-[10px] text-[rgba(201,169,97,0.72)] transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               <AnimatePresence>
@@ -240,7 +240,7 @@ export default function Layout({ children }: { children?: ReactNode }) {
                     >
                       <div className="border-b border-[rgba(201,169,97,0.15)] px-4 py-3">
                         <div className="font-serif text-sm text-[#E0C896]">{user?.username}</div>
-                        <div className="truncate font-mono text-xs text-[rgba(232,228,220,0.4)]">{user?.email}</div>
+                        <div className="truncate font-mono text-xs text-[rgba(232,228,220,0.62)]">{user?.email}</div>
                       </div>
 
                       <div className="py-1">
@@ -248,14 +248,14 @@ export default function Layout({ children }: { children?: ReactNode }) {
                           onClick={() => navigate('/app/profile')}
                           className="flex w-full cursor-pointer items-center gap-3 px-4 py-2 text-sm text-[rgba(232,228,220,0.6)] transition-colors hover:bg-[rgba(201,169,97,0.08)] hover:text-[#E0C896]"
                         >
-                          <i className="fas fa-user-cog w-4 text-center text-[rgba(201,169,97,0.5)]" />
+                          <i className="fas fa-user-cog w-4 text-center text-[rgba(201,169,97,0.72)]" />
                           个人中心
                         </button>
                         <button
                           onClick={() => navigate('/app/profile')}
                           className="flex w-full cursor-pointer items-center gap-3 px-4 py-2 text-sm text-[rgba(232,228,220,0.6)] transition-colors hover:bg-[rgba(201,169,97,0.08)] hover:text-[#E0C896]"
                         >
-                          <i className="fas fa-key w-4 text-center text-[rgba(201,169,97,0.5)]" />
+                          <i className="fas fa-key w-4 text-center text-[rgba(201,169,97,0.72)]" />
                           API 密钥
                         </button>
                       </div>
@@ -296,9 +296,9 @@ export default function Layout({ children }: { children?: ReactNode }) {
               >
                 <div className="mx-auto max-w-[1600px] px-4 py-6 md:px-8">
                   <div className="mb-4 flex items-center gap-3">
-                    <span className="font-mono text-[10px] tracking-[0.25em] text-[rgba(201,169,97,0.5)] uppercase">{currentGroup.title}</span>
+                    <span className="font-mono text-[10px] tracking-[0.25em] text-[rgba(201,169,97,0.72)] uppercase">{currentGroup.title}</span>
                     <span className="h-px flex-1 bg-gradient-to-r from-[rgba(201,169,97,0.25)] to-transparent" />
-                    <span className="font-mono text-[10px] text-[rgba(232,228,220,0.3)]">{currentGroup.items.length} 模块</span>
+                    <span className="font-mono text-[10px] text-[rgba(232,228,220,0.62)]">{currentGroup.items.length} 模块</span>
                   </div>
                   {/* 网格导航 — 暖金卡片 */}
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
@@ -333,8 +333,8 @@ export default function Layout({ children }: { children?: ReactNode }) {
 
       {/* ===== 页脚状态条 ===== */}
       <footer className="relative z-10 border-t border-[rgba(201,169,97,0.12)] bg-[rgba(22,17,13,0.6)] py-3">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 font-mono text-[10px] text-[rgba(232,228,220,0.3)] md:px-8">
-          <span><i className="fas fa-atom mr-1.5 text-[rgba(201,169,97,0.5)]" />墨观 · 学术天文台 · 高等教育科研效率提升系统</span>
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 font-mono text-[10px] text-[rgba(232,228,220,0.62)] md:px-8">
+          <span><i className="fas fa-atom mr-1.5 text-[rgba(201,169,97,0.72)]" />墨观 · 学术天文台 · 高等教育科研效率提升系统</span>
           <span>© 2026 Moguan Observatory · Built with Ascend NPU</span>
         </div>
       </footer>

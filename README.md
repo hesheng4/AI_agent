@@ -4,7 +4,7 @@
 
 ## 功能特性
 
-### 🤖 AI Agent 模块（20+ Agent，分两大工作台）
+### 🤖 AI Agent 模块（17 个业务 Agent + 昇腾 9 模块，分两大工作台）
 
 #### 科研工作台
 
@@ -36,7 +36,7 @@
 | 模块 | Agent / 核心 | 功能 | 状态 |
 |------|------|------|------|
 | 环境概览 | `ascend` | NPU 环境检测、设备管理、资源监控 | ✅ |
-| 模型适配 | `adaptation` | 远程/昇腾模型切换、适配层封装 | ✅ |
+| 模型适配 | `adaptation` | 远程/昇腾模型切换、适配层封装 | ⚠️ 实验性（权重加载/前向推理/算子注册未实现） |
 | 精度对齐 | `alignment` | 远程 vs 本地推理精度对齐验证 | ✅ |
 | 性能采集 | `profiling` | NPU 性能数据采集 | ✅ |
 | 性能调优 | `perf_tuning` | 推理性能参数调优 | ✅ |
@@ -44,6 +44,10 @@
 | 模型验证 | `validator` | 模型推理质量验证 | ✅ |
 | 调试辅助 | `debugging` | NPU 推理调试支持 | ✅ |
 | 历史转技能 | `history_to_skill` | 历史记录转可复用技能 | ✅ |
+
+> 昇腾 9 个模块以 core+api 形式实现，不在 `agents/` 目录与 Agent 注册体系中。
+> `adaptation` 为实验性：`app/core/adaptation.py` 中权重加载、前向推理、
+> vllm registry 注册、Triton 算子 NPU 兼容实现 4 处为 TODO。
 
 ### 🔧 系统特性
 
@@ -134,7 +138,7 @@ make docker-logs
 ```
 research-agent-platform/
 ├── app/                        # 应用代码
-│   ├── agents/                 # AI Agent 模块（20+ Agent）
+│   ├── agents/                 # AI Agent 模块（17 个业务 Agent）
 │   │   ├── base.py            # Agent 基类
 │   │   ├── registry.py        # Agent 自动注册（目录扫描，manifest 不参与运行时）
 │   │   ├── coordinator/       # 协调器（规划+调度+Agent 间结果传递）
@@ -199,7 +203,7 @@ research-agent-platform/
 │   │   ├── vector_store.py   # 向量存储
 │   │   ├── ascend.py         # 昇腾 NPU 核心
 │   │   ├── adaptation.py     # 模型适配核心
-│   │   ├── alignment.py      # 粀度对齐核心
+│   │   ├── alignment.py      # 精度对齐核心
 │   │   ├── profiling.py      # 性能采集核心
 │   │   ├── perf_tuning.py    # 性能调优核心
 │   │   ├── debugging.py      # 调试核心
@@ -271,11 +275,13 @@ research-agent-platform/
 │   └── versions/
 │       └── 6ab33371ef5b_initial_baseline.py  # 初始 baseline（8 表 + 10 索引）
 ├── alembic.ini                # Alembic 配置
-├── tests/                     # 测试（47 文件 / 479 用例）
-│   ├── unit/                 # 单元测试（44 文件，18 Agent 全覆盖）
-│   ├── integration/          # 集成测试（1 文件：E1/E2 认证透传）
-│   ├── e2e/                  # 端到端测试（1 文件：认证全链路，临时 sqlite 隔离）
-│   ├── performance/          # 性能测试（1 文件：延迟冒烟，宽松预算）
+├── tests/                     # 测试（763 passed / 9 skipped）
+│   ├── unit/                 # 单元测试（含数值黄金测试，见下）
+│   │   ├── test_numerical_golden.py        # 数值黄金测试：scipy 为 oracle 校验手写统计/功效实现
+│   │   └── test_citation_network_golden.py # 引用网络黄金测试：受控图解析解对照
+│   ├── integration/          # 集成测试（E1/E2 认证透传）
+│   ├── e2e/                  # 端到端测试（认证全链路，临时 sqlite 隔离）
+│   ├── performance/          # 性能测试（延迟冒烟，宽松预算）
 │   └── alignment/            # 精度对齐测试数据
 ├── scripts/                   # 脚本
 │   ├── deploy.sh             # 部署脚本
@@ -567,6 +573,9 @@ Authorization: Bearer <token>
 ### 运行测试
 
 ```bash
+# 安装测试依赖（数值黄金测试需要 scipy，OMML 测试需要 python-docx）
+pip install scipy python-docx
+
 # 运行所有测试
 make test
 
@@ -797,6 +806,27 @@ MIT License
 ## 架构亮点
 
 > 完整架构（11 章 + 3 张 Mermaid 图 + 差距清单）见 [docs/architecture/architecture-overview.md](docs/architecture/architecture-overview.md)。
+
+### 数值正确性黄金测试
+
+统计核心（`services/statistics.py` 987 行、`services/power_analysis.py` 545 行）为**纯手写实现，零第三方依赖**（仅用 `math`），生产环境不引入 scipy/numpy。为保证数值正确性，测试侧以 scipy 为独立 oracle 做交叉校验（`tests/unit/test_numerical_golden.py`，scipy 仅入 dev 依赖）：
+
+| 校验对象 | 基准 | 断言要点 |
+|---|---|---|
+| `_normal_cdf`（A&S 7.1.26） | `scipy.stats.norm.cdf` | 最大绝对误差 < 1e-6（设计精度 1.5e-7 量级） |
+| `_approx_p_value`（t 分布双侧 p 值） | `scipy.stats.t.sf` | 相对误差 < 1e-4；**反保守检验**（p 值不得系统性偏小）；α=0.05 边界无显著性结论翻转 |
+| `_approx_p_value_f` / `_approx_p_value_chi2` | `scipy.stats.f/chi2.sf` | F 精确；卡方在决策区（p≥1e-3）准确，极端尾部为已知局限（Wilson-Hilferty 固有） |
+| `sample_size_ttest` / `_calculate_power_ttest` | `scipy.stats.nct` 非中心 t 精确解 | 独立两样本用 `2(zα+zβ)²/d²`；样本量与精确解对齐 ±1；真实功效须达标 |
+| `_normal_quantile`（Acklam） | `scipy.stats.norm.ppf` | 误差 ~1.8e-9（回归保护） |
+
+引用网络（`services/citation_network.py`）以受控引用图解析解为基准（`test_citation_network_golden.py`）：
+- **共引（co-citation）**：关系建立在**被引文献**之间（施引文献的参考文献两两配对）
+- **文献耦合（bibliographic coupling）**：关系建立在**施引文献**之间（被引文献的施引者两两配对）
+- 含混合角色图用例（论文既施引又被引用），防止两类节点混入同一配对集合
+
+> 2026-08-31 审计说明：修复前 t 分布 p 值采用正态近似（小样本相对误差最高 49%、系统性反保守），
+> 独立两样本样本量公式缺失 ×2 因子（声称功效 0.84、真实 0.63）。修复后全部对齐精确解，
+> 详见 [reports/audit-round1-report.md](reports/audit-round1-report.md)。
 
 ### 统一 LibraryService（痛点 1 完整状态同步）
 

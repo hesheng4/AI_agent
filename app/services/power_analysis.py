@@ -44,9 +44,20 @@ class PowerAnalysis:
         )
         z_beta = PowerAnalysis._normal_quantile(power)
 
-        # 样本量公式：n = ((z_alpha + z_beta) / d)²
-        n_per_group = ((z_alpha + z_beta) / effect_size) ** 2
-        n_per_group = math.ceil(n_per_group)
+        # 样本量公式
+        # 独立两样本：每组 n = 2(z_a + z_b)^2 / d^2（两组各 n，合计 2n）
+        # 配对样本：   对子数 = (z_a + z_b)^2 / d^2（差值退化为单样本问题）
+        # 此前两种设计共用单样本公式，导致独立两样本每组样本量只有所需的一半
+        # （真实功效约 0.63，却对外报告 0.84）。
+        per_unit = 1 if paired else 2
+        n_per_group = math.ceil(per_unit * ((z_alpha + z_beta) / effect_size) ** 2)
+
+        # 闭式解用正态分位数，忽略了 t 分布在小自由度下临界值更宽，
+        # 会低估所需样本量（如 d=0.8 配对设计闭式解 13 对，真实功效仅 0.754）。
+        # 按 G*Power 的做法向上迭代，直到真实功效达到目标值。
+        n_per_group = PowerAnalysis._inflate_to_target_power(
+            n_per_group, effect_size, alpha, power, test_type, paired
+        )
 
         # 总样本量
         if paired:
@@ -54,8 +65,8 @@ class PowerAnalysis:
         else:
             n_total = n_per_group * 2
 
-        # 计算非中心性参数
-        ncp = effect_size * math.sqrt(n_per_group)
+        # 非中心性参数：独立两样本 ncp = d*sqrt(n/2)，配对 ncp = d*sqrt(n)
+        ncp = PowerAnalysis._noncentrality_ttest(n_per_group, effect_size, paired)
 
         return {
             "n_per_group": n_per_group,
@@ -69,7 +80,7 @@ class PowerAnalysis:
             "non_centrality_parameter": round(ncp, 4),
             "actual_power": round(
                 PowerAnalysis._calculate_power_ttest(
-                    n_per_group, effect_size, alpha, test_type
+                    n_per_group, effect_size, alpha, test_type, paired
                 ),
                 6,
             ),
@@ -241,12 +252,17 @@ class PowerAnalysis:
         alpha: float = 0.05,
         max_n: int = 200,
         test_type: str = "two-sided",
+        paired: bool = False,
     ) -> dict[str, Any]:
-        """t检验功效曲线数据"""
+        """t检验功效曲线数据
+
+        n 的语义与 sample_size_ttest 的 n_per_group 一致：
+        独立两样本为「每组样本量」，配对样本为「对子数」。
+        """
         curve = []
         for n in range(5, max_n + 1, 5):
             power = PowerAnalysis._calculate_power_ttest(
-                n, effect_size, alpha, test_type
+                n, effect_size, alpha, test_type, paired
             )
             curve.append({"n": n, "power": round(power, 4)})
 
@@ -357,17 +373,100 @@ class PowerAnalysis:
 
     # ========== 内部计算方法 ==========
 
+    # 迭代膨胀的安全上限：闭式解的 3 倍且不超过 10^6，防止病态输入死循环
+    _MAX_INFLATE_FACTOR = 3
+    _MAX_N = 1_000_000
+
     @staticmethod
-    def _calculate_power_ttest(
-        n: int, effect_size: float, alpha: float, test_type: str = "two-sided"
+    def _inflate_to_target_power(
+        n: int,
+        effect_size: float,
+        alpha: float,
+        power: float,
+        test_type: str,
+        paired: bool,
+    ) -> int:
+        """向上迭代样本量，直到真实功效达到目标值
+
+        闭式解基于正态分位数，在小自由度下会低估所需样本量（t 分布临界值
+        比 z 更宽）。此处按 G*Power 的惯例逐步增大 n 直至达标。
+        """
+        limit = min(
+            PowerAnalysis._MAX_N,
+            max(n * PowerAnalysis._MAX_INFLATE_FACTOR, n + 1000),
+        )
+        while n < limit:
+            if (
+                PowerAnalysis._calculate_power_ttest(
+                    n, effect_size, alpha, test_type, paired
+                )
+                >= power
+            ):
+                return n
+            n += 1
+        return n
+
+    @staticmethod
+    def _noncentrality_ttest(
+        n: int, effect_size: float, paired: bool = False
     ) -> float:
-        """计算t检验的实际功效"""
-        z_alpha = PowerAnalysis._normal_quantile(
+        """t 检验非中心性参数
+
+        独立两样本（每组 n）：ncp = d * sqrt(n / 2)
+        配对样本（n 个对子）：ncp = d * sqrt(n)
+        """
+        if paired:
+            return effect_size * math.sqrt(n)
+        return effect_size * math.sqrt(n / 2)
+
+    @staticmethod
+    def _t_critical(df: int, alpha: float, test_type: str = "two-sided") -> float:
+        """t 分布临界值（Cornish-Fisher 展开，三阶）
+
+        正态近似在小自由度下临界值偏窄，会把功效系统性高估。三阶
+        Cornish-Fisher 在 df>=10 时精度约 1e-4，df>=5 时约 1e-3。
+        """
+        if df <= 0:
+            return PowerAnalysis._normal_quantile(
+                1 - alpha / 2 if test_type == "two-sided" else 1 - alpha
+            )
+        z = PowerAnalysis._normal_quantile(
             1 - alpha / 2 if test_type == "two-sided" else 1 - alpha
         )
-        ncp = effect_size * math.sqrt(n)
-        z_crit = z_alpha - ncp
-        power = 1 - PowerAnalysis._normal_cdf(z_crit)
+        v = float(df)
+        z2, z3, z5, z7 = z * z, z**3, z**5, z**7
+        return (
+            z
+            + (z3 + z) / (4 * v)
+            + (5 * z5 + 16 * z3 + 3 * z) / (96 * v * v)
+            + (3 * z7 + 19 * z5 + 17 * z3 - 15 * z) / (384 * v**3)
+        )
+
+    @staticmethod
+    def _degrees_of_freedom(n: int, paired: bool) -> int:
+        """独立两样本 df = 2n-2；配对 df = n-1"""
+        return max(1, (n - 1) if paired else (2 * n - 2))
+
+    @staticmethod
+    def _calculate_power_ttest(
+        n: int,
+        effect_size: float,
+        alpha: float,
+        test_type: str = "two-sided",
+        paired: bool = False,
+    ) -> float:
+        """计算t检验的实际功效
+
+        n 的语义：独立两样本为「每组样本量」，配对样本为「对子数」。
+        此前存在两处叠加错误：ncp 统一按单样本口径 d*sqrt(n)（应为
+        d*sqrt(n/2)），且临界值用正态分位数（应随 df 变宽）。两者合起来
+        在独立两样本下把功效高估最多 0.21（n=32/组、d=0.5 时报 0.84，
+        真实 0.63）。
+        """
+        ncp = PowerAnalysis._noncentrality_ttest(n, effect_size, paired)
+        df = PowerAnalysis._degrees_of_freedom(n, paired)
+        t_crit = PowerAnalysis._t_critical(df, alpha, test_type)
+        power = 1 - PowerAnalysis._normal_cdf(t_crit - ncp)
         return max(0, min(1, power))
 
     @staticmethod
@@ -483,7 +582,12 @@ class PowerAnalysis:
 
     @staticmethod
     def _normal_cdf(z: float) -> float:
-        """标准正态CDF"""
+        """标准正态CDF（Abramowitz and Stegun 7.1.26）
+
+        该公式近似的是 erf(x)，自变量为 x = z / sqrt(2)。展开点 t 与指数项
+        exp(-x^2) 必须同用 x；此前展开点误用 z，使最大绝对误差从设计值
+        1.5e-7 恶化到 3.7e-2。与 app/services/statistics.py 同源。
+        """
         if z < -8:
             return 0.0
         if z > 8:
@@ -497,10 +601,10 @@ class PowerAnalysis:
         p = 0.3275911
 
         sign = 1 if z >= 0 else -1
-        z = abs(z)
-        t = 1.0 / (1.0 + p * z)
+        x = abs(z) / math.sqrt(2)
+        t = 1.0 / (1.0 + p * x)
         y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * math.exp(
-            -z * z / 2.0
+            -x * x
         )
 
         return 0.5 * (1.0 + sign * y)

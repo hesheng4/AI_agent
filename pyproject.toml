@@ -31,6 +31,11 @@ pytest-cov = "^4.1.0"
 black = "^23.12.0"
 ruff = "^0.1.8"
 mypy = "^1.7.1"
+# 数值黄金测试基准：tests/unit/test_numerical_golden.py 用它交叉校验
+# 手写的统计/功效实现。仅测试用，不进生产依赖（生产保持零第三方依赖手写）。
+scipy = ">=1.11"
+# tests/unit/test_latex_l7_omml_semantics.py 依赖 docx 解析 OMML
+python-docx = ">=1.1"
 
 [tool.black]
 line-length = 88

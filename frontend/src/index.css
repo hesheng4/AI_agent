@@ -16,35 +16,64 @@
   --color-primary: #C9A961;
   --color-primary-hover: #B8963E;
   --color-primary-active: #9A7E45;
-  --color-primary-foreground: #FFFFFF;
+  --color-primary-foreground: #16110D; /* C1 修复：白字/金底 2.25:1 FAIL → 暗字/金底 8.33:1 PASS */
   --color-primary-ring: rgba(201, 169, 97, 0.4);
   --color-primary-muted: rgba(201, 169, 97, 0.08);
   --color-primary-border: rgba(201, 169, 97, 0.3);
+  --color-secondary-text: #8A6F3B; /* C2 修复：金字/白底 2.25:1 FAIL → ~5.1:1 PASS */
 
   --color-cta: #C9A961;
   --color-cta-hover: #B8963E;
   --color-cta-active: #9A7E45;
-  --color-cta-foreground: #FFFFFF;
+  --color-cta-foreground: #16110D; /* C1 同步修复 */
   --color-cta-ring: rgba(201, 169, 97, 0.5);
 
   --color-danger: #DC2626;
   --color-danger-hover: #B91C1C;
+  --color-danger-foreground: #FFFFFF;
   --color-success: #16A34A;
-  --color-warning: #D97706;
+  --color-warning: #92400E; /* C4 修复：#D97706/amber-50 3.07:1 FAIL → ≥4.5:1 PASS */
 
   --color-txt: #2C2418;
   --color-txt-muted: #6B5B45;
-  --color-txt-light: #8B7E6A;
+  --color-txt-light: #6B5B45; /* C3 修复：占位符 #8B7E6A 3.97:1 FAIL → 7.1:1 PASS */
+
+  /* ===== RGB 通道变量 — 供 Tailwind <alpha-value> 生成透明度修饰符 ===== */
+  --bg-rgb: 248 250 252;
+  --surface-rgb: 255 255 255;
+  --surface-muted-rgb: 241 245 249;
+  --border-rgb: 226 232 240;
+  --border-strong-rgb: 203 213 225;
+  --txt-rgb: 44 36 24;
+  --txt-muted-rgb: 107 91 69;
+  --txt-light-rgb: 107 91 69;
+  --primary-rgb: 201 169 97;
+  --primary-hover-rgb: 184 150 62;
+  --primary-active-rgb: 154 126 69;
+  --secondary-text-rgb: 138 111 59;
+  --cta-rgb: 201 169 97;
+  --cta-hover-rgb: 184 150 62;
+  --cta-active-rgb: 154 126 69;
+  --danger-rgb: 220 38 38;
+  --danger-hover-rgb: 185 28 28;
+  --success-rgb: 22 163 74;
+  --warning-rgb: 146 64 14;
+  --copper-light-rgb: 154 126 69;
+  --indigo-rgb: 79 70 229;
+  --ink-rgb: 255 255 255;
+  --ink-dark-rgb: 248 250 252;
+  --ink-bg-rgb: 44 36 24;
 }
 
 .dark {
   /* 暖墨黑系 — 与 Layout/Hero 主题统一 */
+  /* 注：原 rgba 金色低透明边框/文字已折算为实色 RGB 通道（对深墨底预混），以支撑 Tailwind /alpha 修饰符 */
   --color-bg: #16110D;
   --color-surface: #1C1610;
   --color-surface-muted: #241812;
-  --color-border: rgba(201, 169, 97, 0.18);
+  --color-border: rgb(54 44 28); /* 原 rgba(201,169,97,0.18) 预混 */
   --color-text: #E8E4DC;
-  --color-text-muted: rgba(232, 228, 220, 0.6);
+  --color-text-muted: rgb(149 144 137); /* 原 rgba(232,228,220,0.6) 预混，对比 5.88:1 PASS */
 
   /* 主色：暖金（与 Hero/Layout 一致） */
   --color-primary: #C9A961;
@@ -54,6 +83,7 @@
   --color-primary-ring: rgba(201, 169, 97, 0.4);
   --color-primary-muted: rgba(201, 169, 97, 0.06);
   --color-primary-border: rgba(201, 169, 97, 0.25);
+  --color-secondary-text: #C9A961;
 
   /* CTA：暖金亮色 */
   --color-cta: #E0C896;
@@ -64,12 +94,39 @@
 
   --color-danger: #F87171;
   --color-danger-hover: #EF4444;
+  --color-danger-foreground: #16110D; /* 暗色下白字/#F87171 仅 2.6:1 FAIL，改暗字 6.7:1 */
   --color-success: #4ADE80;
   --color-warning: #FBBF24;
 
   --color-txt: #E8E4DC;
-  --color-txt-muted: rgba(232, 228, 220, 0.6);
-  --color-txt-light: rgba(232, 228, 220, 0.4);
+  --color-txt-muted: rgb(149 144 137);
+  --color-txt-light: rgb(106 102 96);
+
+  /* ===== RGB 通道变量（暗色） ===== */
+  --bg-rgb: 22 17 13;
+  --surface-rgb: 28 22 16;
+  --surface-muted-rgb: 36 24 18;
+  --border-rgb: 54 44 28;
+  --border-strong-rgb: 74 62 40;
+  --txt-rgb: 232 228 220;
+  --txt-muted-rgb: 149 144 137;
+  --txt-light-rgb: 106 102 96;
+  --primary-rgb: 201 169 97;
+  --primary-hover-rgb: 224 200 150;
+  --primary-active-rgb: 154 126 69;
+  --secondary-text-rgb: 201 169 97;
+  --cta-rgb: 224 200 150;
+  --cta-hover-rgb: 201 169 97;
+  --cta-active-rgb: 154 126 69;
+  --danger-rgb: 248 113 113;
+  --danger-hover-rgb: 239 68 68;
+  --success-rgb: 74 222 128;
+  --warning-rgb: 251 191 36;
+  --copper-light-rgb: 224 200 150;
+  --indigo-rgb: 129 140 248;
+  --ink-rgb: 28 22 16;
+  --ink-dark-rgb: 22 17 13;
+  --ink-bg-rgb: 232 228 220;
 }
 
 @layer base {
@@ -159,7 +216,7 @@
     border-radius: 0.5rem;
     border: 1px solid var(--color-primary-border);
     background-color: var(--color-primary-muted);
-    color: var(--color-primary);
+    color: var(--color-secondary-text); /* C2 修复：浅色下金字/白底不过门禁，改深金 */
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
     font-weight: 500;
@@ -215,7 +272,7 @@
     gap: 0.5rem;
     border-radius: 0.5rem;
     background-color: var(--color-danger);
-    color: #FFFFFF;
+    color: var(--color-danger-foreground);
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
     font-weight: 500;

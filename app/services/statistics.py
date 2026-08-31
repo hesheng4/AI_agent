@@ -851,15 +851,21 @@ class StatisticsEnhancer:
 
     @staticmethod
     def _approx_p_value(t: float, df: int) -> float:
-        """近似t分布p值（使用正态近似）"""
+        """t 分布双侧 p 值（精确解，经不完全 Beta 函数）
+
+        恒等式：若 T ~ t(df)，则 P(|T| > t) = I_x(df/2, 1/2)，
+        其中 x = df / (df + t^2)。
+
+        此前用正态近似加 ad-hoc 小样本修正（z = t/sqrt(1+t^2/(2df))），
+        实测 48 个采样点中 45 个相对误差 >10%，且 p 值系统性偏小（反保守），
+        在 alpha=0.05 下会把本不显著的结果误判为显著（假阳性膨胀）。
+        精确解只需复用同文件内已实现的 _incomplete_beta，无需新增依赖。
+        """
         if df <= 0:
             return 1.0
-        # 对于大样本用正态近似
-        z = t
-        if df < 30:
-            # 小样本修正
-            z = t / math.sqrt(1 + t**2 / (2 * df))
-        return 2 * (1 - StatisticsEnhancer._normal_cdf(abs(z)))
+        x = df / (df + t * t)
+        p = StatisticsEnhancer._incomplete_beta(df / 2, 0.5, x)
+        return min(1.0, max(0.0, p))
 
     @staticmethod
     def _approx_p_value_f(f: float, df1: int, df2: int) -> float:
@@ -882,7 +888,13 @@ class StatisticsEnhancer:
 
     @staticmethod
     def _normal_cdf(z: float) -> float:
-        """标准正态CDF近似"""
+        """标准正态CDF近似（Abramowitz and Stegun 7.1.26）
+
+        该公式近似的是 erf(x)，自变量为 x = z / sqrt(2)。展开点 t 与
+        指数项 exp(-x^2) 必须使用同一个 x；此前展开点误用 z 而指数项用
+        -z^2/2，导致最大绝对误差从设计值 1.5e-7 恶化到 3.7e-2（约 53
+        万倍），并使所有经此函数的 p 值系统性偏小（反保守）。
+        """
         if z < -8:
             return 0.0
         if z > 8:
@@ -897,10 +909,10 @@ class StatisticsEnhancer:
         p = 0.3275911
 
         sign = 1 if z >= 0 else -1
-        z = abs(z)
-        t = 1.0 / (1.0 + p * z)
+        x = abs(z) / math.sqrt(2)
+        t = 1.0 / (1.0 + p * x)
         y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * math.exp(
-            -z * z / 2.0
+            -x * x
         )
 
         return 0.5 * (1.0 + sign * y)

@@ -24,15 +24,15 @@ export function Button({
 }: ButtonProps) {
   const variants: Record<ButtonVariant, string> = {
     primary:
-      'bg-primary text-white shadow-sm hover:bg-primary-hover hover:shadow-md active:bg-primary-active active:shadow-sm focus-visible:ring-primary-ring',
+      'bg-primary text-primary-foreground shadow-sm hover:bg-primary-hover hover:shadow-md active:bg-primary-active active:shadow-sm focus-visible:ring-primary-ring',
     cta:
-      'bg-cta text-white shadow-sm hover:bg-cta-hover hover:shadow-md active:bg-cta-active active:shadow-sm focus-visible:ring-cta-ring',
+      'bg-cta text-cta-foreground shadow-sm hover:bg-cta-hover hover:shadow-md active:bg-cta-active active:shadow-sm focus-visible:ring-cta-ring',
     secondary:
-      'border border-primary-border bg-primary-muted text-primary hover:bg-primary/10 hover:border-primary/40 focus-visible:ring-primary-ring',
+      'border border-primary-border bg-primary-muted text-secondary-text hover:bg-primary/10 hover:border-primary/40 focus-visible:ring-primary-ring',
     ghost:
       'text-txt-muted hover:bg-bg-muted hover:text-txt focus-visible:ring-primary-ring',
     danger:
-      'bg-danger text-white shadow-sm hover:bg-danger-hover hover:shadow-md active:shadow-sm focus-visible:ring-red-300',
+      'bg-danger text-danger-foreground shadow-sm hover:bg-danger-hover hover:shadow-md active:shadow-sm focus-visible:ring-red-300',
   };
 
   const sizes: Record<ButtonSize, string> = {
@@ -140,7 +140,7 @@ export function EmptyState({ icon, title, hint, action }: { icon: string; title:
 // 错误提示
 export function ErrorBanner({ message }: { message: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-danger">
+    <div className="flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 px-4 py-2.5 text-sm text-danger">
       <i className="fas fa-exclamation-circle" />
       <span>{message}</span>
     </div>
@@ -150,7 +150,7 @@ export function ErrorBanner({ message }: { message: string }) {
 // 成功提示
 export function SuccessBanner({ message }: { message: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-success">
+    <div className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-4 py-2.5 text-sm text-success">
       <i className="fas fa-check-circle" />
       <span>{message}</span>
     </div>
@@ -160,7 +160,7 @@ export function SuccessBanner({ message }: { message: string }) {
 // 警告提示
 export function WarningBanner({ message }: { message: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-warning">
+    <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-4 py-2.5 text-sm text-warning">
       <i className="fas fa-exclamation-triangle" />
       <span>{message}</span>
     </div>
@@ -201,14 +201,14 @@ export function Badge({
   const variants: Record<BadgeVariant, string> = {
     default: 'border-border bg-bg-muted text-txt-muted',
     primary: 'border-primary-border bg-primary-muted text-primary',
-    success: 'border-green-200 bg-green-50 text-success',
-    danger: 'border-red-200 bg-red-50 text-danger',
-    warning: 'border-amber-200 bg-amber-50 text-warning',
+    success: 'border-success/30 bg-success/10 text-success',
+    danger: 'border-danger/30 bg-danger/10 text-danger',
+    warning: 'border-warning/30 bg-warning/10 text-warning',
     // backward compat aliases
     copper: 'border-primary-border bg-primary-muted text-primary',
-    jade: 'border-green-200 bg-green-50 text-success',
-    vermillion: 'border-red-200 bg-red-50 text-danger',
-    indigo: 'border-indigo-200 bg-indigo-50 text-indigo',
+    jade: 'border-success/30 bg-success/10 text-success',
+    vermillion: 'border-danger/30 bg-danger/10 text-danger',
+    indigo: 'border-indigo/30 bg-indigo/10 text-indigo',
   };
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${variants[variant]} ${className}`}>
