@@ -145,6 +145,30 @@ class WritingAgent(BaseAgent):
             )
             prompt += f"\n\n术语账本（必须使用规范形式）：\n{terms_str}"
 
+        # 上游文献检索结果（协调器注入）：列出可引用文献，标题原文进入提示
+        papers = request.get("papers") or []
+        if papers:
+            paper_lines = []
+            for i, p in enumerate(papers[:10], 1):
+                if isinstance(p, dict):
+                    title = str(p.get("title", "")).strip()
+                    if not title:
+                        continue
+                    authors = ", ".join(
+                        str(a) for a in (p.get("authors") or [])[:3]
+                    )
+                    meta = f"{authors} ({p.get('year', '')})" if authors else str(
+                        p.get("year", "")
+                    )
+                    paper_lines.append(f"{i}. {title} {meta}".strip())
+                else:
+                    paper_lines.append(f"{i}. {p}")
+            if paper_lines:
+                prompt += (
+                    "\n\n可引用检索文献（正文引用须来自该列表）：\n"
+                    + "\n".join(paper_lines)
+                )
+
         content = await self.call_llm(
             prompt,
             GENERATE_SYSTEM_PROMPT,

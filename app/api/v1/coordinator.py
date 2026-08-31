@@ -3,9 +3,10 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.agents.coordinator import get_coordinator_agent
+from app.agents.coordinator.planner import WORKFLOW_TEMPLATES
 from app.api.deps import get_current_user
 from app.models.user import User
 
@@ -24,6 +25,20 @@ class OrchestrateRequest(RouteRequest):
         description="任务 ID。传入则事件发布到该 id（供前端先建 WS 连接再发起编排）；"
         "缺省由协调器生成并在响应 task_id 中返回",
     )
+    workflow_template: str | None = Field(
+        default=None,
+        description="工作流模板 id（如 write_from_scratch / revise）。"
+        "提供时按模板步骤逐步编排，缺省走意图路由",
+    )
+
+    @field_validator("workflow_template")
+    @classmethod
+    def _validate_workflow_template(cls, v: str | None) -> str | None:
+        if v is not None and v not in WORKFLOW_TEMPLATES:
+            raise ValueError(
+                f"未知工作流模板: {v!r}，可用: {sorted(WORKFLOW_TEMPLATES)}"
+            )
+        return v
 
 
 class OrchestrateResponse(BaseModel):

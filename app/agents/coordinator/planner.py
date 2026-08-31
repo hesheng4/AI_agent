@@ -1,5 +1,7 @@
 from typing import Any
 
+from app.utils.exceptions import AgentException
+
 # ── 16 Nature-skills 关键词路由表 ──
 # 格式: (agent_name, [中文关键词], [英文关键词])
 SKILL_KEYWORD_MAP: list[tuple[str, list[str], list[str]]] = [
@@ -200,7 +202,7 @@ WORKFLOW_TEMPLATES: dict[str, dict[str, Any]] = {
             },
             {"step": 2, "agent": "reader", "task": "read", "desc": "精读关键文献"},
             {"step": 3, "agent": "experiment", "task": "design", "desc": "实验设计"},
-            {"step": 4, "agent": "writing", "task": "draft", "desc": "起草论文初稿"},
+            {"step": 4, "agent": "writing", "task": "generate", "desc": "起草论文初稿"},
             {"step": 5, "agent": "methods", "task": "draft", "desc": "起草Methods"},
             {"step": 6, "agent": "stats", "task": "draft", "desc": "统计报告起草"},
             {"step": 7, "agent": "figure", "task": "generate", "desc": "生成图表"},
@@ -211,8 +213,13 @@ WORKFLOW_TEMPLATES: dict[str, dict[str, Any]] = {
                 "desc": "数据可用性声明",
             },
             {"step": 9, "agent": "polishing", "task": "polish", "desc": "全文润色"},
-            {"step": 10, "agent": "reviewer", "task": "review", "desc": "自审模拟"},
-            {"step": 11, "agent": "citation", "task": "check", "desc": "引用检查"},
+            {"step": 10, "agent": "reviewer", "task": "assess", "desc": "自审模拟"},
+            {
+                "step": 11,
+                "agent": "citation",
+                "task": "verify-citations",
+                "desc": "引用检查",
+            },
             {
                 "step": 12,
                 "agent": "submission_package",
@@ -254,11 +261,11 @@ WORKFLOW_TEMPLATES: dict[str, dict[str, Any]] = {
     "revise": {
         "label": "修稿",
         "steps": [
-            {"step": 1, "agent": "reader", "task": "read", "desc": "审读审稿意见"},
-            {"step": 2, "agent": "response", "task": "draft", "desc": "逐条回复起草"},
-            {"step": 3, "agent": "writing", "task": "revise", "desc": "修改论文"},
-            {"step": 4, "agent": "polishing", "task": "polish", "desc": "润色修改稿"},
-            {"step": 5, "agent": "reviewer", "task": "review", "desc": "自审确认"},
+            {"step": 1, "agent": "reader", "task": "read", "desc": "审读稿件与意见"},
+            {"step": 2, "agent": "reviewer", "task": "assess", "desc": "评审意见结构化"},
+            {"step": 3, "agent": "response", "task": "draft", "desc": "逐条回复起草"},
+            {"step": 4, "agent": "writing", "task": "revise", "desc": "修改论文"},
+            {"step": 5, "agent": "polishing", "task": "polish", "desc": "润色修改稿"},
         ],
     },
     "transform": {
@@ -276,11 +283,15 @@ WORKFLOW_TEMPLATES: dict[str, dict[str, Any]] = {
 }
 
 # ── 依赖关系（扩展版） ──
+# 注意：data（通用数据分析）与 data_agent（数据可用性声明）是两个独立
+# 注册 Agent，依赖边须各自保留，勿当作重复项清理。
 AGENT_DEPENDENCIES: dict[str, list[str]] = {
     "writing": ["literature", "reader"],
-    "data": ["experiment"],
+    "data": ["experiment", "literature"],
+    "data_agent": ["experiment", "literature"],
     "polishing": ["writing"],
     "reviewer": ["writing", "stats", "methods"],
+    "citation": ["writing", "polishing"],
     "cover": ["writing"],
     "submission_package": ["cover", "stats", "methods"],
     "response": ["reviewer"],
@@ -288,16 +299,54 @@ AGENT_DEPENDENCIES: dict[str, list[str]] = {
 
 # ── 上游结果字段级注入映射（差距 #3：声明式，替代 coordinator 的 if 链）──
 # 格式: {下游 agent: {目标字段: (上游 agent, 源字段)}}
-# 目标字段不存在（调用方未显式传入）时才填充；新增数据流 = 加一行表项。
-UPSTREAM_FIELD_MAP: dict[str, dict[str, tuple[str, str]]] = {
+# 源字段三种形态：字符串=单个源字段；列表=顺序取第一个命中值；
+# None=整个上游结果。目标字段默认只补缺失（调用方显式传入优先）；
+# 模板驱动编排（子任务带 _template 标记）时上游产出覆写目标字段。
+UPSTREAM_FIELD_MAP: dict[str, dict[str, tuple[str, str | list[str] | None]]] = {
     "writing": {
         "papers": ("literature", "papers"),
         "summaries": ("literature", "summaries"),
+        "suggestions": ("reviewer", "improvement_suggestions"),
     },
     "data": {
         "papers": ("literature", "papers"),
         "experiment_plan": ("experiment", "plan"),
     },
+    "data_agent": {
+        "papers": ("literature", "papers"),
+        "experiment_plan": ("experiment", "plan"),
+    },
+    "reviewer": {
+        "content": ("writing", ["content", "revised_content"]),
+    },
+    "polishing": {
+        "content": ("writing", ["content", "revised_content"]),
+    },
+    "response": {
+        "review_result": ("reviewer", None),
+    },
+}
+
+# ── 默认机器任务映射 ──
+# 关键词路由命中的自然语言任务（如「文献检索」）不在 Agent 分派表里，
+# 会被目标 Agent 以「未知任务类型」拒绝。分解子任务时统一改写为
+# 分派表接受的机器任务名；不在表中的 Agent（如 reader，process 忽略
+# task 字段）保持原样。
+DEFAULT_AGENT_TASK: dict[str, str] = {
+    "literature": "search",
+    "citation": "verify-citations",
+    "writing": "generate",
+    "polishing": "polish",
+    "stats": "audit",
+    "methods": "audit",
+    "figure": "generate",
+    "data_agent": "generate-statement",
+    "data": "analyze",
+    "reviewer": "assess",
+    "response": "draft",
+    "cover": "draft",
+    "submission_package": "checklist",
+    "experiment": "design",
 }
 
 
@@ -367,13 +416,94 @@ class TaskPlanner:
                     queue.append(dep)
         return result
 
+    def validate_template(self, template_id: str, template: dict) -> None:
+        """模板合法性校验：id 在册 + 同一 Agent 不得出现多次
+
+        当前调度模型每个 Agent 只执行一个任务、上游结果经注入下传；
+        同 Agent 多步（如 submit 模板的 submission_package×3）会导致
+        结果相互覆盖，明确拒绝而非静默错乱。
+        """
+        if template_id not in WORKFLOW_TEMPLATES:
+            raise AgentException(
+                f"未知工作流模板: {template_id!r}，"
+                f"可用: {sorted(WORKFLOW_TEMPLATES)}",
+                "coordinator",
+            )
+        seen: set[str] = set()
+        dupes: list[str] = []
+        for step in template["steps"]:
+            agent = step["agent"]
+            if agent in seen:
+                dupes.append(agent)
+            seen.add(agent)
+        if dupes:
+            raise AgentException(
+                f"工作流模板 {template_id!r} 含重复 Agent: "
+                f"{sorted(set(dupes))}；每个 Agent 仅支持单步任务",
+                "coordinator",
+            )
+
     def decompose_task(self, request: dict[str, Any], agents: list[str]) -> list[dict]:
-        """分解任务"""
+        """分解任务
+
+        - 模板驱动（request 含 workflow_template）：按模板步骤逐步展开，
+          执行顺序即步骤顺序，每步依赖其前所有步骤的 Agent（上游结果
+          经字段级注入下传）；子任务携带 _template 标记供注入侧识别覆写
+          语义。
+        - 无模板：每个命中 Agent 一个子任务，请求浅拷贝隔离，并把
+          自然语言任务改写为分派表接受的机器任务名（DEFAULT_AGENT_TASK）。
+        """
+        template_id = request.get("workflow_template")
+        if template_id:
+            template = WORKFLOW_TEMPLATES[template_id]
+            self.validate_template(template_id, template)
+            return self._decompose_template(request, template)
+
         subtasks = []
         for agent_name in agents:
-            subtask = {"agent": agent_name, "request": request, "dependencies": []}
-            subtasks.append(subtask)
+            sub_request = dict(request)
+            default_task = DEFAULT_AGENT_TASK.get(agent_name)
+            if default_task:
+                sub_request["task"] = default_task
+            subtasks.append(
+                {"agent": agent_name, "request": sub_request, "dependencies": []}
+            )
         return subtasks
+
+    def _decompose_template(
+        self, request: dict[str, Any], template: dict
+    ) -> list[dict]:
+        """模板展开为逐步子任务：步骤顺序即执行顺序，依赖取前缀"""
+        subtasks: list[dict] = []
+        prior_agents: list[str] = []
+        for step in template["steps"]:
+            agent_name = step["agent"]
+            sub_request = dict(request)
+            sub_request.pop("workflow_template", None)
+            sub_request["task"] = step["task"]
+            if agent_name == "literature" and not str(
+                sub_request.get("query") or ""
+            ).strip():
+                sub_request["query"] = self._synthesize_query(request)
+            subtasks.append(
+                {
+                    "agent": agent_name,
+                    "request": sub_request,
+                    "dependencies": list(prior_agents),
+                    "_template": template["label"],
+                }
+            )
+            prior_agents.append(agent_name)
+        return subtasks
+
+    @staticmethod
+    def _synthesize_query(request: dict[str, Any]) -> str:
+        """模板首步文献检索缺 query 时，从请求上下文合成检索词"""
+        for key in ("topic", "outline", "content", "task"):
+            value = str(request.get(key) or "").strip()
+            if value:
+                return value[:200]
+        return "相关领域综述"
 
     def analyze_dependencies(self, subtasks: list[dict]) -> list[dict]:
         """分析依赖关系 — 使用扩展依赖表"""

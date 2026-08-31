@@ -65,9 +65,9 @@ def test_writing_receives_papers_and_summaries(coordinator):
     assert out["request"]["summaries"] == {"p1": "s1"}
 
 
-def test_data_receives_papers_and_experiment_plan(coordinator):
+def test_data_agent_receives_papers_and_experiment_plan(coordinator):
     task = {
-        "agent": "data",
+        "agent": "data_agent",
         "request": {},
         "dependencies": ["experiment", "literature"],
     }

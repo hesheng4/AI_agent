@@ -3,7 +3,11 @@ import json
 from typing import Any
 
 from app.agents.base import BaseAgent
-from app.agents.coordinator.planner import UPSTREAM_FIELD_MAP, TaskPlanner
+from app.agents.coordinator.planner import (
+    UPSTREAM_FIELD_MAP,
+    WORKFLOW_TEMPLATES,
+    TaskPlanner,
+)
 from app.agents.registry import get_agent_registry
 from app.core.events import event_bus
 from app.core.tracing import span, trace_context
@@ -68,30 +72,45 @@ class CoordinatorAgent(BaseAgent):
                 task_id, {"type": "start", "task_id": task_id, "trace_id": tid}
             )
 
-            agents_needed = self.planner.identify_agents(request)
-            if not agents_needed:
-                agents_needed = await self._llm_route(request)
-            # 补全缺失上游（静态依赖表闭包不完整会误报循环依赖）
-            completed = self.planner.complete_upstream(agents_needed)
-            if completed != agents_needed:
-                logger.info(f"自动补全上游Agents: {agents_needed} -> {completed}")
-                agents_needed = completed
-            logger.info(f"需要的Agents: {agents_needed}")
+            # 模板驱动：步骤顺序即执行顺序（前缀依赖），跳过关键词路由/
+            # 上游补全/静态依赖分析；无模板路径保持原行为（零回归）
+            template_id = request.get("workflow_template")
+            if template_id:
+                template = WORKFLOW_TEMPLATES.get(template_id)
+                self.planner.validate_template(template_id, template or {})
+                subtasks = self.planner.decompose_task(request, [])
+                agents_needed = [t["agent"] for t in subtasks]
+                logger.info(f"模板 {template_id!r} 展开为 {len(subtasks)} 步")
+                execution_plan = subtasks
+            else:
+                agents_needed = self.planner.identify_agents(request)
+                if not agents_needed:
+                    agents_needed = await self._llm_route(request)
+                # 补全缺失上游（静态依赖表闭包不完整会误报循环依赖）
+                completed = self.planner.complete_upstream(agents_needed)
+                if completed != agents_needed:
+                    logger.info(f"自动补全上游Agents: {agents_needed} -> {completed}")
+                    agents_needed = completed
+                logger.info(f"需要的Agents: {agents_needed}")
+
+                subtasks = self.planner.decompose_task(request, agents_needed)
+                logger.info(f"分解为 {len(subtasks)} 个子任务")
+
+                execution_plan = self.planner.analyze_dependencies(subtasks)
+
             await event_bus.publish(
                 task_id, {"type": "planned", "agents": agents_needed}
             )
-
-            subtasks = self.planner.decompose_task(request, agents_needed)
-            logger.info(f"分解为 {len(subtasks)} 个子任务")
 
             # 注入 task_id 供 _execute_single_task 发布事件 + trace
             for t in subtasks:
                 t["_task_id"] = task_id
                 t["_trace_id"] = tid
 
-            execution_plan = self.planner.analyze_dependencies(subtasks)
-            results = await self._execute_plan_parallel(execution_plan, task_id)
-            final_result = self._integrate_results(results)
+            results = await self._execute_plan_parallel(
+                execution_plan, task_id, fail_fast=bool(template_id)
+            )
+            final_result = self._integrate_results(results, fail_fast=bool(template_id))
             final_result["task_id"] = task_id
             final_result["trace_id"] = tid
 
@@ -101,9 +120,14 @@ class CoordinatorAgent(BaseAgent):
             return final_result
 
     async def _execute_plan_parallel(
-        self, execution_plan: list[dict], task_id: str = ""
+        self, execution_plan: list[dict], task_id: str = "", fail_fast: bool = False
     ) -> list[dict]:
-        """并行执行计划，并将上游 Agent 结果注入下游任务请求"""
+        """并行执行计划，并将上游 Agent 结果注入下游任务请求
+
+        fail_fast（模板驱动编排，Q12）：任一步失败即终止工作流，后续层级
+        不执行；失败记入 results，由整合侧标 status=failed。非模板路径
+        保持原语义（单任务异常直抛 / 多任务 partial_failure）。
+        """
         results = []
         completed = set()
         context: dict[str, dict[str, Any]] = {}
@@ -119,7 +143,20 @@ class CoordinatorAgent(BaseAgent):
 
             if len(prepared_tasks) == 1:
                 task = prepared_tasks[0]
-                result = await self._execute_single_task(task)
+                try:
+                    result = await self._execute_single_task(task)
+                except Exception as e:
+                    if not fail_fast:
+                        raise
+                    logger.error(f"任务 {task['agent']} 失败，终止工作流: {e}")
+                    results.append(
+                        {
+                            "agent": task["agent"],
+                            "result": {"error": str(e)},
+                            "status": "failed",
+                        }
+                    )
+                    break
                 results.append(result)
                 completed.add(task["agent"])
                 if result.get("status") == "success":
@@ -128,6 +165,7 @@ class CoordinatorAgent(BaseAgent):
                 tasks = [self._execute_single_task(t) for t in prepared_tasks]
                 level_results = await asyncio.gather(*tasks, return_exceptions=True)
 
+                level_failed = False
                 for i, result in enumerate(level_results):
                     task = prepared_tasks[i]
                     if isinstance(result, Exception):
@@ -139,11 +177,15 @@ class CoordinatorAgent(BaseAgent):
                                 "status": "failed",
                             }
                         )
+                        level_failed = True
                     else:
                         results.append(result)
                         if result.get("status") == "success":
                             context[task["agent"]] = result["result"]
                     completed.add(task["agent"])
+                if fail_fast and level_failed:
+                    logger.error("fail-fast: 本层存在失败任务，后续层级不再执行")
+                    break
 
         return results
 
@@ -152,14 +194,19 @@ class CoordinatorAgent(BaseAgent):
 
         字段级注入走声明式映射 UPSTREAM_FIELD_MAP（差距 #3）：
         {下游 agent: {目标字段: (上游 agent, 源字段)}}——新增数据流
-        加一行表项即可，不再改 if 链。调用方显式传入的字段优先
-        （目标字段不存在时才填充）。
+        加一行表项即可。源字段形态：字符串=单个源字段；列表=顺序取
+        第一个命中值；None=整个上游结果。
+
+        注入优先级：默认只补缺失字段（调用方显式传入优先）；模板驱动
+        子任务（携带 "_template" 标记）改为覆写——下游步骤必须消费
+        链路真实产出而非调用方原始入参。
         """
         deps = task.get("dependencies", [])
         if not deps:
             return task
 
         request = dict(task.get("request") or {})
+        overwrite = bool(task.get("_template"))
         upstream: dict[str, Any] = {}
         for dep in deps:
             if dep in context:
@@ -170,15 +217,29 @@ class CoordinatorAgent(BaseAgent):
             for field, (up_agent, src_field) in UPSTREAM_FIELD_MAP.get(
                 task["agent"], {}
             ).items():
-                if request.get(field):
+                if not overwrite and request.get(field):
                     continue  # 调用方显式传入优先
                 src = upstream.get(up_agent) or {}
-                if src.get(src_field):
-                    request[field] = src[src_field]
+                value = self._pick_field(src, src_field)
+                if value:
+                    request[field] = value
 
         task = dict(task)
         task["request"] = request
         return task
+
+    @staticmethod
+    def _pick_field(src: dict[str, Any], src_field: str | list[str] | None) -> Any:
+        """按源字段形态取值：None=整个上游结果；列表=首个命中候选"""
+        if src_field is None:
+            return src or None
+        if isinstance(src_field, list):
+            for candidate in src_field:
+                value = src.get(candidate)
+                if value:
+                    return value
+            return None
+        return src.get(src_field)
 
     def _group_by_level(self, execution_plan: list[dict]) -> list[list[dict]]:
         """按依赖层级分组任务"""
@@ -251,8 +312,14 @@ class CoordinatorAgent(BaseAgent):
                 )
             raise
 
-    def _integrate_results(self, results: list[dict]) -> dict[str, Any]:
-        """整合结果"""
+    def _integrate_results(
+        self, results: list[dict], fail_fast: bool = False
+    ) -> dict[str, Any]:
+        """整合结果
+
+        fail_fast（模板驱动，Q12）：存在失败 ⇒ status=failed，error 指明
+        失败步骤；非模板路径保持 partial_failure 语义。
+        """
         integrated = {
             "agents_used": [],
             "results": {},
@@ -269,7 +336,17 @@ class CoordinatorAgent(BaseAgent):
                 integrated["failed_agents"].append(agent_name)
 
         if integrated["failed_agents"]:
-            integrated["status"] = "partial_failure"
+            if fail_fast:
+                integrated["status"] = "failed"
+                first_failed = next(
+                    r for r in results if r.get("status") == "failed"
+                )
+                detail = (first_failed.get("result") or {}).get("error", "")
+                integrated["error"] = (
+                    f"工作流在步骤 {first_failed['agent']} 处终止: {detail}"
+                )
+            else:
+                integrated["status"] = "partial_failure"
 
         return integrated
 
