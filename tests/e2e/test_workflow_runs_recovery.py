@@ -1,7 +1,8 @@
-"""E6 运行记录 API 守卫：列表/详情/404/跨用户隔离/非 failed 状态 409
+"""E6 运行记录 API 守卫：列表/详情/404/跨用户隔离/状态守卫
 
 设计契约: docs/plans/workflow-error-recovery-v1.md
-runs 记录按 user 隔离（路径含 user_id），resume 仅允许 failed 状态。
+runs 记录按 user 隔离（路径含 user_id），resume 仅允许 failed 状态
+（v2 起过期 running 可接管，活跃 running 仍 409）。
 全链路恢复用例（失败 → checkpoint → resume 全绿）见 test_workflow_chain.py。
 """
 
@@ -106,3 +107,23 @@ async def test_resume_rejects_non_failed_status(db_isolated_client, runs_dir):
         f"/api/v1/coordinator/runs/{rec.run_id}/resume", headers=headers
     )
     assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_resume_rejects_fresh_running_record(db_isolated_client, runs_dir):
+    """v2 状态守卫：活跃 running（近期有步进）→ 409，防双跑；
+    过期 running 的接管路径见 claim 单测（tests/unit/test_run_store.py）"""
+    client = db_isolated_client
+    user_id, headers = await _register_and_login(client)
+    # create_run 默认 status=running 且 updated_at=刚刚 → 活跃
+    rec = create_run(
+        user_id,
+        {"kind": "workflow", "workflow_id": "a" * 12},
+        {},
+        [{"agent": "reader", "request": {"task": "t"}, "dependencies": []}],
+    )
+    resp = await client.post(
+        f"/api/v1/coordinator/runs/{rec.run_id}/resume", headers=headers
+    )
+    assert resp.status_code == 409
+    assert "仍在进行中" in resp.json()["detail"]

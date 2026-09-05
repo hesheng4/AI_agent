@@ -13,6 +13,7 @@ from app.agents.registry import get_agent_registry
 from app.config import get_settings
 from app.core.events import event_bus
 from app.core.runs import (
+    FAILURE_TRANSIENT,
     RunRecorder,
     classify_failure,
     create_run,
@@ -28,6 +29,7 @@ logger = get_logger("agent.coordinator")
 def _sanitize_request(request: dict[str, Any]) -> dict[str, Any]:
     """冻结请求快照：剔除 _ 前缀内部字段（_user_api_* 凭据不落盘 run 记录）"""
     return {k: v for k, v in request.items() if not str(k).startswith("_")}
+
 
 _ROUTING_SYSTEM_PROMPT = (
     "你是研究Agent平台的路由器。根据用户意图，从能力清单中选出真正需要执行的 Agent。"
@@ -205,7 +207,7 @@ class CoordinatorAgent(BaseAgent):
             if len(prepared_tasks) == 1:
                 task = prepared_tasks[0]
                 try:
-                    result = await self._execute_step(task)
+                    result = await self._execute_with_retry(task, run_recorder)
                 except Exception as e:
                     if not fail_fast:
                         raise
@@ -238,7 +240,9 @@ class CoordinatorAgent(BaseAgent):
                 if result.get("status") == "success":
                     context[task["agent"]] = result["result"]
             else:
-                tasks = [self._execute_step(t) for t in prepared_tasks]
+                tasks = [
+                    self._execute_with_retry(t, run_recorder) for t in prepared_tasks
+                ]
                 level_results = await asyncio.gather(*tasks, return_exceptions=True)
 
                 level_failed = False
@@ -280,7 +284,46 @@ class CoordinatorAgent(BaseAgent):
 
         return results
 
-    async def _execute_step(self, task: dict) -> dict:
+    async def _execute_with_retry(
+        self, task: dict[str, Any], run_recorder: RunRecorder | None
+    ) -> dict[str, Any]:
+        """单步执行 + 瞬态失败自动重试（E6 v2，仅 checkpointed run）
+
+        预算 AGENT_STEP_MAX_RETRIES（默认 0 = opt-in，保持 v1 手动恢复
+        语义）；仅分类为 transient 的失败重试（限流/超时/步级超时），
+        permanent/unknown 直抛——盲目重试非瞬态失败只会掩盖根因。
+        中间失败尝试即时落盘（attempts 累加 + attempt_errors 证据链），
+        重试期间崩溃留下的记录依然可 triage。
+
+        无 run_recorder（非模板 ad-hoc 路径）不重试，语义零变化。
+        """
+        if run_recorder is None:
+            return await self._execute_step(task)
+        settings = get_settings()
+        max_retries = max(0, int(settings.AGENT_STEP_MAX_RETRIES))
+        delay = max(0.0, float(settings.AGENT_STEP_RETRY_DELAY))
+        attempt = 0
+        while True:
+            try:
+                return await self._execute_step(task)
+            except Exception as e:
+                if classify_failure(e) != FAILURE_TRANSIENT or attempt >= max_retries:
+                    raise
+                attempt += 1
+                logger.warning(
+                    f"步骤 {task['agent']} 瞬态失败，自动重试 "
+                    f"{attempt}/{max_retries}: {e}"
+                )
+                run_recorder.step_finished(
+                    task["agent"],
+                    status="failed",
+                    error=str(e),
+                    failure_class=classify_failure(e),
+                )
+                if delay > 0:
+                    await asyncio.sleep(delay)
+
+    async def _execute_step(self, task: dict[str, Any]) -> dict[str, Any]:
         """单步执行 + 步级墙钟超时（E6: AGENT_STEP_TIMEOUT，默认 600s）
 
         超时合成为 StepTimeoutError（TimeoutError 子类 → 分类 transient），
@@ -448,9 +491,7 @@ class CoordinatorAgent(BaseAgent):
         if integrated["failed_agents"]:
             if fail_fast:
                 integrated["status"] = "failed"
-                first_failed = next(
-                    r for r in results if r.get("status") == "failed"
-                )
+                first_failed = next(r for r in results if r.get("status") == "failed")
                 detail = (first_failed.get("result") or {}).get("error", "")
                 integrated["error"] = (
                     f"工作流在步骤 {first_failed['agent']} 处终止: {detail}"

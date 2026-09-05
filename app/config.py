@@ -153,10 +153,21 @@ class Settings(BaseSettings):
     # 批量验证并发上限（礼貌池约束）
     CITATION_VERIFY_CONCURRENCY: int = 4
 
-    # ========== 工作流运行记录与恢复（E6，见 docs/plans/workflow-error-recovery-v1.md）==========
+    # ========== 工作流运行记录与恢复（E6，见 workflow-error-recovery-v1.md）==========
     # 步级墙钟超时（秒）：防单步永久卡死；超时合成 StepTimeoutError
     # → 分类 transient → 可 resume。0 或负值关闭步级超时（回退无限等待）。
     AGENT_STEP_TIMEOUT: float = 600.0
+    # 步级瞬态失败自动重试预算（仅 checkpointed run 的模板/自定义 DAG 路径）。
+    # 默认 0 = opt-in：保持 v1 fail-fast 手动恢复语义（LLM 客户端请求级
+    # 已有 429/超时退避重试，步级仍瞬态失败多为持续故障窗口，盲目重试
+    # 只会翻倍烧钱）；设 1+ 启用。仅 transient 类失败重试，
+    # permanent/unknown 直抛。
+    AGENT_STEP_MAX_RETRIES: int = 0
+    # 重试前退避（秒）
+    AGENT_STEP_RETRY_DELAY: float = 5.0
+    # 进程中断遗留的 running 记录：超过该秒数无活动即可被 resume 接管；
+    # 应大于最坏单步时长（步级超时 × (1+重试) + 退避）。<=0 关闭接管。
+    RUN_STALE_AFTER: int = 3600
     # 每用户保留的 run 记录上限（cap-on-write，写入后裁剪最旧）
     RUN_RETENTION_LIMIT: int = 50
 

@@ -8,9 +8,11 @@ from pydantic import BaseModel, Field, field_validator
 from app.agents.coordinator import get_coordinator_agent
 from app.agents.coordinator.planner import WORKFLOW_TEMPLATES
 from app.api.deps import get_current_user
+from app.config import get_settings
 from app.core.events import event_bus
 from app.core.runs import (
     RUN_FAILED,
+    RUN_RUNNING,
     RunRecorder,
     claim_run_for_resume,
     compute_resume_sets,
@@ -18,6 +20,7 @@ from app.core.runs import (
     get_run,
     list_run_summaries,
     plan_signature,
+    record_is_stale,
 )
 from app.core.workflows import get_workflow, workflow_to_execution_plan
 from app.models.user import User
@@ -156,10 +159,18 @@ async def resume_run(
     record = get_run(user_id, run_id)
     if not record:
         raise HTTPException(404, "run 记录不存在")
-    if record.get("status") != RUN_FAILED:
-        raise HTTPException(
-            409, f"run 状态为 {record.get('status')!r}，仅 failed 状态可恢复"
-        )
+
+    # 状态守卫：failed 可恢复；running 仅在超期无活动（疑似进程中断）时
+    # 可接管（E6 v2）；其余状态拒绝
+    stale_after = float(get_settings().RUN_STALE_AFTER)
+    allow_stale_running = False
+    status = record.get("status")
+    if status == RUN_RUNNING:
+        if not record_is_stale(record, stale_after):
+            raise HTTPException(409, "run 仍在进行中（近期有步进），请稍后重试")
+        allow_stale_running = True
+    elif status != RUN_FAILED:
+        raise HTTPException(409, f"run 状态为 {status!r}，仅 failed 状态可恢复")
 
     source = record.get("source") or {}
     kind = source.get("kind")
@@ -199,7 +210,13 @@ async def resume_run(
         t["_trace_id"] = task_id
 
     rerun_agents, completed_entries = compute_resume_sets(record)
-    if not claim_run_for_resume(user_id, run_id, task_id):
+    if not claim_run_for_resume(
+        user_id,
+        run_id,
+        task_id,
+        allow_stale_running=allow_stale_running,
+        stale_after=stale_after,
+    ):
         raise HTTPException(409, "run 正在被其他恢复流程接管，请稍后重试")
 
     try:

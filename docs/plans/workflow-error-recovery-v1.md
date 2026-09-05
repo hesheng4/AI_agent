@@ -3,6 +3,27 @@
 > 2026-09-05 grill 会话产物。逐项决策均已确认；"未问而采用的默认"一节为设计者代答默认值，可否决。
 > 背景：c6378b6 已落地模板编排 fail-fast 失败语义（停止执行的另一半）；本设计补齐恢复的另一半——失败之后发生什么。
 
+## v2 落地记录（2026-09-05）
+
+在 v1 全量落地（checkpoint + 手动 resume + 步级超时 + 分类器）之后，按
+决策 #6/#7 预留的演进方向补齐两项：
+
+1. **瞬态失败自动重试（opt-in）**：`AGENT_STEP_MAX_RETRIES`（默认 0）+
+   `AGENT_STEP_RETRY_DELAY`（默认 5s）。仅 `transient` 类失败重试
+   （限流/超时/步级超时），permanent/unknown 直抛；仅 checkpointed run
+   （模板/自定义 DAG 路径）生效，ad-hoc 路径零变化。中间失败尝试即时
+   落盘（`attempts` 累加 + 步骤条目 `attempt_errors` 证据链），重试期间
+   崩溃留下的记录依然可 triage。默认 0 的理由：LLM 客户端请求级已有
+   429/超时退避重试，步级仍瞬态失败多为持续故障窗口，且 fail-fast 是
+   c6378b6 刚确立的显式语义——行为变更应 opt-in 而非静默。
+2. **中断遗留 running 记录接管**：`RUN_STALE_AFTER`（默认 3600s，<=0 关闭）。
+   resume 守卫允许接管超过该秒数无活动的 running 记录（进程崩溃孤儿，
+   其中途步骤在记录里仍是 pending，compute_resume_sets 天然覆盖）；
+   活跃 running（近期有步进）仍 409 防双跑。
+
+明确推迟：run 记录迁 PostgreSQL（多 worker 部署出现前无收益；JSON 结构
+即迁移契约）。
+
 ## 范围
 
 仅覆盖两条编排路径：**模板驱动编排**（WORKFLOW_TEMPLATES）与**自定义 DAG 编排**（E5，经 `workflow_to_execution_plan` 编译）。

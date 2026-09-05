@@ -306,16 +306,57 @@ def list_run_summaries(user_id: str) -> list[dict[str, Any]]:
     return sorted(summaries, key=lambda x: x.get("created_at", ""), reverse=True)
 
 
-def claim_run_for_resume(user_id: str, run_id: str, task_id: str = "") -> bool:
-    """resume 并发守卫: 仅 failed → running 迁移成功返回 True
+def record_is_stale(record: dict[str, Any], stale_after: float) -> bool:
+    """running 记录是否已过期（updated_at 距今超过 stale_after 秒无活动）
+
+    updated_at 每次步进都会重写，因此过期 = 自最后活动起无进展，
+    即进程大概率已中断。解析失败按未过期处理（保守，不误杀活跃 run）。
+    """
+    if stale_after <= 0:
+        return False
+    try:
+        updated = datetime.fromisoformat(str(record.get("updated_at", "")))
+        elapsed = (datetime.now(UTC) - updated).total_seconds()
+    except (ValueError, TypeError):
+        return False
+    return elapsed > stale_after
+
+
+def claim_run_for_resume(
+    user_id: str,
+    run_id: str,
+    task_id: str = "",
+    allow_stale_running: bool = False,
+    stale_after: float | None = None,
+) -> bool:
+    """resume 并发守卫: failed → running 迁移（或接管过期的 running）成功返回 True
+
+    E6 v2 起允许接管 running 记录（allow_stale_running=True 且超过
+    stale_after 秒无活动）——进程中断遗留的孤儿 run 从此可恢复；
+    活跃 run（近期有步进）仍拒绝，避免双跑。stale_after 缺省读
+    RUN_STALE_AFTER 配置。
 
     同步读-改-写、中间无 await，在单事件循环内为原子；多进程部署
     （与 data/workflows 相同假设破坏时）不保证互斥。
     """
+    if stale_after is None:
+        stale_after = float(get_settings().RUN_STALE_AFTER)
     record = _read_run(user_id, run_id)
     if not record:
         return False
-    if record.get("status") != RUN_FAILED:
+    status = record.get("status")
+    if status == RUN_FAILED:
+        pass
+    elif (
+        status == RUN_RUNNING
+        and allow_stale_running
+        and record_is_stale(record, stale_after)
+    ):
+        logger.warning(
+            f"接管疑似中断的 running run（超 {stale_after}s 无活动）: "
+            f"run_id={run_id}"
+        )
+    else:
         return False
     record["status"] = RUN_RUNNING
     if task_id:
@@ -422,6 +463,11 @@ class RunRecorder:
             entry["finished_at"] = _utcnow()
             if started_at:
                 entry["started_at"] = started_at
+            # v2 自动重试：保全每次失败尝试的证据（成功后仍可追溯）
+            if status == STEP_FAILED:
+                entry.setdefault("attempt_errors", []).append(
+                    {"error": error, "failure_class": failure_class, "at": _utcnow()}
+                )
 
         self._mutate(mutate)
 

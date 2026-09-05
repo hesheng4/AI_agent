@@ -9,6 +9,8 @@
   已完成 = success 且不在重执行集合（其载荷预注入，不重复 LLM 工作）
 """
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from app.config import get_settings
@@ -151,6 +153,9 @@ def test_step_reexecution_increments_attempts(runs_dir):
     record = get_run("u1", rec.run_id)
     a = _step(record, "a")
     assert a["attempts"] == 2 and a["status"] == "success" and a["error"] == ""
+    # v2 自动重试：失败尝试证据链保全（成功后仍可追溯）
+    assert len(a["attempt_errors"]) == 1
+    assert a["attempt_errors"][0]["failure_class"] == "transient"
 
 
 def test_get_run_user_isolation(runs_dir):
@@ -262,3 +267,62 @@ def test_resume_sets_includes_pending_steps(runs_dir):
     rerun, completed = compute_resume_sets(get_run("u1", rec.run_id))
     assert rerun == ["b", "c"]
     assert completed == [{"agent": "a", "result": {"x": 1}}]
+
+
+# ─────────────────────────────────────────────
+# v2: 进程中断遗留的 running 记录接管
+# ─────────────────────────────────────────────
+
+
+def _backdate_record(runs_dir, user_id: str, run_id: str, hours: float) -> None:
+    """把记录 updated_at 回写为 hours 小时前（模拟进程中断后无活动）
+
+    绕过 _save_run 直写文件：_save_run 每次落盘都会重刷 updated_at
+    （活动语义），会把回写覆盖掉。
+    """
+    import json
+
+    path = runs_dir / f"{user_id}_{run_id}.json"
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["updated_at"] = (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
+    path.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+
+
+def test_claim_stale_running_record(runs_dir, monkeypatch):
+    """E6 v2：中断遗留的 running（超期无活动）可接管；活跃 running 拒绝"""
+    monkeypatch.setattr(get_settings(), "RUN_STALE_AFTER", 3600)
+    rec = create_run(
+        "u1", {"kind": "workflow", "workflow_id": "a" * 12}, {}, _chain_plan()
+    )
+    # 活跃 running（updated_at = 刚刚）→ 不可接管，避免双跑
+    assert (
+        claim_run_for_resume("u1", rec.run_id, "t1", allow_stale_running=True) is False
+    )
+
+    _backdate_record(runs_dir, "u1", rec.run_id, hours=2)
+    assert (
+        claim_run_for_resume("u1", rec.run_id, "t2", allow_stale_running=True) is True
+    )
+    assert get_run("u1", rec.run_id)["status"] == RUN_RUNNING
+
+
+def test_stale_claim_disabled_when_nonpositive(runs_dir, monkeypatch):
+    """RUN_STALE_AFTER<=0 关闭接管（严格 v1：仅 failed 可恢复）"""
+    monkeypatch.setattr(get_settings(), "RUN_STALE_AFTER", 0)
+    rec = create_run(
+        "u1", {"kind": "workflow", "workflow_id": "a" * 12}, {}, _chain_plan()
+    )
+    _backdate_record(runs_dir, "u1", rec.run_id, hours=99)
+    assert (
+        claim_run_for_resume("u1", rec.run_id, "t", allow_stale_running=True) is False
+    )
+
+
+def test_stale_claim_requires_opt_in(runs_dir, monkeypatch):
+    """allow_stale_running=False（默认）时过期 running 仍不可接管"""
+    monkeypatch.setattr(get_settings(), "RUN_STALE_AFTER", 3600)
+    rec = create_run(
+        "u1", {"kind": "workflow", "workflow_id": "a" * 12}, {}, _chain_plan()
+    )
+    _backdate_record(runs_dir, "u1", rec.run_id, hours=2)
+    assert claim_run_for_resume("u1", rec.run_id, "t") is False

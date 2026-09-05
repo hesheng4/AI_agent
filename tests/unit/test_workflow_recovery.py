@@ -5,6 +5,8 @@
 - resume 预注入已完成载荷 → 已完成 agent 零重跑，失败步及其下游重执行
 - 自定义 DAG partial_failure 语义保持；resume 重跑 failed 及其传递下游
 - 步级墙钟超时合成 StepTimeoutError → 分类 transient → 正常 checkpoint
+- v2 瞬态自动重试（opt-in，AGENT_STEP_MAX_RETRIES）：仅 transient 重试，
+  中间失败尝试落盘 attempt_errors；无 recorder / 预算 0 时不重试
 """
 
 import asyncio
@@ -25,7 +27,11 @@ from app.core.runs import (
     get_run,
     plan_signature,
 )
-from app.utils.exceptions import AgentException, LLMTimeoutException
+from app.utils.exceptions import (
+    AgentException,
+    LLMRateLimitException,
+    LLMTimeoutException,
+)
 
 
 @pytest.fixture
@@ -283,3 +289,109 @@ async def test_process_template_creates_run_record(coordinator, runs_dir):
     assert all(not k.startswith("_") for k in record["request"])
     assert "_user_api_key" not in record["request"]
     assert all(s["status"] == "success" for s in record["steps"])
+
+
+# ─────────────────────────────────────────────
+# v2 瞬态失败自动重试（opt-in：AGENT_STEP_MAX_RETRIES）
+# ─────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_transient_failure_retried_then_succeeds(
+    coordinator, runs_dir, monkeypatch
+):
+    """瞬态失败（LLM 限流）→ 自动重试后成功；attempts 累加 + 证据链保全"""
+    monkeypatch.setattr(get_settings(), "AGENT_STEP_MAX_RETRIES", 1)
+    monkeypatch.setattr(get_settings(), "AGENT_STEP_RETRY_DELAY", 0.01)
+    fakes = coordinator._fakes
+    fakes["a"] = FakeAgent(
+        "a", [("raise", LLMRateLimitException()), ("ok", {"step": "a2"})]
+    )
+    plan = [{"agent": "a", "request": {}, "dependencies": []}]
+
+    rec = _recorder_for(plan)
+    results = await coordinator._execute_plan_parallel(
+        plan, "", fail_fast=True, run_recorder=rec
+    )
+    assert results[0]["status"] == "success"
+    assert fakes["a"].calls == 2
+
+    record = get_run("u_test", rec.run_id)
+    step = record["steps"][0]
+    assert step["attempts"] == 2 and step["status"] == "success"
+    assert len(step["attempt_errors"]) == 1
+    assert step["attempt_errors"][0]["failure_class"] == "transient"
+
+
+@pytest.mark.asyncio
+async def test_permanent_failure_never_retried(coordinator, runs_dir, monkeypatch):
+    """permanent/unknown 失败直抛不重试——盲目重试只会掩盖根因"""
+    monkeypatch.setattr(get_settings(), "AGENT_STEP_MAX_RETRIES", 3)
+    fakes = coordinator._fakes
+    fakes["a"] = FakeAgent(
+        "a", [("raise", AgentException("deterministic", "a")), ("ok", {})]
+    )
+    plan = [{"agent": "a", "request": {}, "dependencies": []}]
+
+    rec = _recorder_for(plan)
+    results = await coordinator._execute_plan_parallel(
+        plan, "", fail_fast=True, run_recorder=rec
+    )
+    assert results[0]["status"] == "failed"
+    assert fakes["a"].calls == 1
+
+
+@pytest.mark.asyncio
+async def test_no_retry_without_recorder(coordinator, runs_dir):
+    """无 run_recorder（ad-hoc 路径）不重试，语义零变化"""
+    fakes = coordinator._fakes
+    fakes["a"] = FakeAgent("a", [("raise", LLMTimeoutException()), ("ok", {})])
+    plan = [{"agent": "a", "request": {}, "dependencies": []}]
+
+    with pytest.raises(LLMTimeoutException):
+        await coordinator._execute_plan_parallel(plan, "", fail_fast=False)
+    assert fakes["a"].calls == 1
+
+
+@pytest.mark.asyncio
+async def test_retry_budget_exhausted_checkpoints_final_failure(
+    coordinator, runs_dir, monkeypatch
+):
+    """预算耗尽 → 最终失败正常 checkpoint（fail-fast 生效，下游不执行）"""
+    monkeypatch.setattr(get_settings(), "AGENT_STEP_MAX_RETRIES", 1)
+    monkeypatch.setattr(get_settings(), "AGENT_STEP_RETRY_DELAY", 0.01)
+    fakes = coordinator._fakes
+    fakes["a"] = FakeAgent("a", [("raise", LLMRateLimitException())])
+    fakes["b"] = FakeAgent("b", [("ok", {})])
+    plan = [
+        {"agent": "a", "request": {}, "dependencies": []},
+        {"agent": "b", "request": {}, "dependencies": ["a"]},
+    ]
+
+    rec = _recorder_for(plan)
+    results = await coordinator._execute_plan_parallel(
+        plan, "", fail_fast=True, run_recorder=rec
+    )
+    assert results[-1]["status"] == "failed"
+    assert fakes["b"].calls == 0, "fail-fast：预算耗尽后下游不执行"
+
+    record = get_run("u_test", rec.run_id)
+    step = record["steps"][0]
+    assert step["attempts"] == 2  # 中间失败 + 最终失败
+    assert len(step["attempt_errors"]) == 2
+    assert step["failure_class"] == "transient"
+
+
+@pytest.mark.asyncio
+async def test_zero_budget_disables_retry(coordinator, runs_dir):
+    """AGENT_STEP_MAX_RETRIES=0（默认）→ 回退 v1 纯手动恢复语义"""
+    fakes = coordinator._fakes
+    fakes["a"] = FakeAgent("a", [("raise", LLMTimeoutException()), ("ok", {})])
+    plan = [{"agent": "a", "request": {}, "dependencies": []}]
+
+    rec = _recorder_for(plan)
+    results = await coordinator._execute_plan_parallel(
+        plan, "", fail_fast=True, run_recorder=rec
+    )
+    assert results[0]["status"] == "failed"
+    assert fakes["a"].calls == 1
