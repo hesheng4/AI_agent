@@ -31,6 +31,7 @@ from app.agents.coordinator.planner import (
     AGENT_DEPENDENCIES,
     WORKFLOW_TEMPLATES,
 )
+from app.core.runs import create_run, finalize_run
 
 pytestmark = pytest.mark.e2e
 
@@ -254,9 +255,9 @@ async def test_write_from_scratch_chain_success(fake_coordinator):
 
     template_agents = _template_agents("write_from_scratch")
     used = set(result["agents_used"])
-    assert template_agents <= used, (
-        f"模板 Agent 未全部执行: 缺失 {template_agents - used}"
-    )
+    assert (
+        template_agents <= used
+    ), f"模板 Agent 未全部执行: 缺失 {template_agents - used}"
 
 
 @pytest.mark.asyncio
@@ -313,8 +314,7 @@ async def test_write_from_scratch_draft_reaches_polishing_and_reviewer(
 
     reviewer_prompts = fakes["reviewer"].prompts_for("reviewer")
     assert DRAFT_MARKER in reviewer_prompts, (
-        "writing 生成的草稿未流入 reviewer 的 LLM prompt，"
-        "writing→reviewer 边未接通"
+        "writing 生成的草稿未流入 reviewer 的 LLM prompt，" "writing→reviewer 边未接通"
     )
 
 
@@ -339,9 +339,9 @@ async def test_revise_chain_success(fake_coordinator):
 
     template_agents = _template_agents("revise")
     used = set(result["agents_used"])
-    assert template_agents <= used, (
-        f"模板 Agent 未全部执行: 缺失 {template_agents - used}"
-    )
+    assert (
+        template_agents <= used
+    ), f"模板 Agent 未全部执行: 缺失 {template_agents - used}"
 
 
 @pytest.mark.asyncio
@@ -374,15 +374,14 @@ async def test_revise_chain_review_issue_reaches_response_and_revision(
     )
 
     writing_result = result["results"].get("writing") or {}
-    assert writing_result.get("revised_content"), (
-        f"writing.revise 未产出修订正文: {writing_result}"
-    )
+    assert writing_result.get(
+        "revised_content"
+    ), f"writing.revise 未产出修订正文: {writing_result}"
     assert not writing_result.get("parse_error"), writing_result
 
     polishing_prompts = fakes["polishing"].prompts_for("polishing")
     assert REVISED_MARKER in polishing_prompts, (
-        "修订后的正文未流入 polishing 的 LLM prompt，"
-        "writing→polishing 边未接通"
+        "修订后的正文未流入 polishing 的 LLM prompt，" "writing→polishing 边未接通"
     )
 
 
@@ -405,19 +404,19 @@ async def test_submit_template_duplicate_agent_rejected(fake_coordinator):
             }
         )
     message = str(exc_info.value)
-    assert "重复" in message or "duplicate" in message.lower(), (
-        f"重复 Agent 未被明确拒绝: {message}"
-    )
+    assert (
+        "重复" in message or "duplicate" in message.lower()
+    ), f"重复 Agent 未被明确拒绝: {message}"
 
 
 def test_planner_dependency_edges_for_chain():
     """依赖图契约：citation 有依赖边；data 键名与 Agent 注册名一致。"""
-    assert "citation" in AGENT_DEPENDENCIES, (
-        "AGENT_DEPENDENCIES 缺少 citation 依赖边，引用校验不在任何上游之后"
-    )
-    assert "data_agent" in AGENT_DEPENDENCIES or "data" not in AGENT_DEPENDENCIES, (
-        "AGENT_DEPENDENCIES 使用废弃键名 'data'，应为注册名 'data_agent'"
-    )
+    assert (
+        "citation" in AGENT_DEPENDENCIES
+    ), "AGENT_DEPENDENCIES 缺少 citation 依赖边，引用校验不在任何上游之后"
+    assert (
+        "data_agent" in AGENT_DEPENDENCIES or "data" not in AGENT_DEPENDENCIES
+    ), "AGENT_DEPENDENCIES 使用废弃键名 'data'，应为注册名 'data_agent'"
 
 
 @pytest.mark.asyncio
@@ -475,12 +474,13 @@ def _unique_creds() -> tuple[str, str]:
 
 @pytest.mark.asyncio
 async def test_orchestrate_accepts_workflow_template_over_http(
-    db_isolated_client, monkeypatch
+    db_isolated_client, runs_dir, monkeypatch
 ):
     """HTTP 冒烟：注册→登录→/orchestrate 传模板不被拒绝，且按模板展开执行。
 
     与进程内用例共享协调器单例，故本用例自行打桩（FakeLLM + 检索桩），
     不依赖用例执行顺序；结束后清理实例缓存。
+    runs_dir：E6 起模板编排会落 run 记录，隔离到临时目录防污染真实存储。
     """
     coordinator = get_coordinator_agent()
     coordinator._agent_instances.clear()
@@ -531,9 +531,9 @@ async def test_orchestrate_accepts_workflow_template_over_http(
                 "workflow_template": "revise",
             },
         )
-        assert resp.status_code == 200, (
-            f"/orchestrate 拒绝了 workflow_template 请求: {resp.status_code} {resp.text}"
-        )
+        assert (
+            resp.status_code == 200
+        ), f"/orchestrate 拒绝了 workflow_template 请求: {resp.status_code} {resp.text}"
         body = resp.json()
         assert body["task_id"] and body["trace_id"]
 
@@ -541,9 +541,9 @@ async def test_orchestrate_accepts_workflow_template_over_http(
         assert final["status"] == "success", final
         template_agents = _template_agents("revise")
         used = set(final["agents_used"])
-        assert template_agents <= used, (
-            f"HTTP 编排未按模板展开: 缺失 {template_agents - used}"
-        )
+        assert (
+            template_agents <= used
+        ), f"HTTP 编排未按模板展开: 缺失 {template_agents - used}"
     finally:
         coordinator._agent_instances.clear()
 
@@ -621,14 +621,14 @@ async def test_template_midchain_failure_fails_fast(fake_coordinator, monkeypatc
 
     assert result["status"] == "failed", result
     assert result["failed_agents"] == ["reviewer"], result
-    assert "reviewer" in result.get("error", ""), (
-        f"错误信息未指明失败步骤: {result}"
-    )
+    assert "reviewer" in result.get("error", ""), f"错误信息未指明失败步骤: {result}"
     # agents_used 截止于失败点：失败前步骤在列，后续步骤缺席
     assert result["agents_used"] == ["reader", "reviewer"], result
     for name in ("response", "writing", "polishing"):
         assert name not in result["results"], f"{name} 不应出现在结果中"
-        assert not fakes[name].calls, (
+        assert not fakes[
+            name
+        ].calls, (
             f"{name} 在上游失败后仍被执行（FakeLLM 有 {len(fakes[name].calls)} 次调用）"
         )
 
@@ -647,9 +647,197 @@ async def test_no_template_failure_semantics_unchanged(fake_coordinator):
     literature.process = _boom
     try:
         with pytest.raises(Exception) as exc_info:
-            await coordinator.process(
-                {"task": "文献检索", "query": "量子计算综述"}
-            )
+            await coordinator.process({"task": "文献检索", "query": "量子计算综述"})
         assert "非模板路径故障" in str(exc_info.value)
     finally:
         literature.process = original
+
+
+# ─────────────────────────────────────────────
+# E6 恢复链路：编排失败 → checkpoint → resume 全绿
+# ─────────────────────────────────────────────
+
+
+async def _register_and_login(client) -> tuple[str, dict]:
+    """注册 + 登录，返回 (user_id, Bearer headers)"""
+    token = uuid.uuid4().hex
+    email, username = f"e2e_{token[:12]}@example.com", f"u_{token[:10]}"
+    reg = await client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "username": username, "password": "Passw0rd!e2e"},
+    )
+    assert reg.status_code == 200, reg.text
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": "Passw0rd!e2e"},
+    )
+    assert login.status_code == 200, login.text
+    access = login.json()["access_token"]
+    return reg.json()["id"], {"Authorization": f"Bearer {access}"}
+
+
+@pytest.mark.asyncio
+async def test_orchestrate_failure_then_http_resume_recovers(
+    db_isolated_client, fake_coordinator, runs_dir, monkeypatch
+):
+    """revise 模板第 2 步注入故障 → orchestrate 失败并落 checkpoint；
+    解除故障后 resume：reader 不重跑（FakeLLM 调用数作证），下游补齐全绿"""
+    client = db_isolated_client
+    user_id, headers = await _register_and_login(client)
+    coordinator = fake_coordinator["coordinator"]
+    fakes = fake_coordinator["fakes"]
+
+    reviewer = coordinator.get_agent("reviewer")
+    original_reviewer_process = reviewer.process
+
+    async def _boom(request):  # noqa: ANN001
+        raise RuntimeError("e2e 恢复链路注入故障")
+
+    monkeypatch.setattr(reviewer, "process", _boom)
+
+    orch = await client.post(
+        "/api/v1/coordinator/orchestrate",
+        json={
+            "task": "根据审稿意见修订论文",
+            "content": "# Abstract\n恢复链路占位。",
+            "workflow_template": "revise",
+        },
+        headers=headers,
+    )
+    assert orch.status_code == 200, orch.text
+    final = orch.json()["result"]
+    assert final["status"] == "failed", final
+    run_id = final.get("run_id")
+    assert run_id, f"失败响应应携带 run_id: {final}"
+
+    detail = await client.get(f"/api/v1/coordinator/runs/{run_id}", headers=headers)
+    assert detail.status_code == 200
+    record = detail.json()
+    assert record["status"] == "failed"
+    steps = {s["agent"]: s for s in record["steps"]}
+    assert steps["reader"]["status"] == "success"
+    assert steps["reviewer"]["status"] == "failed"
+    assert steps["reviewer"]["failure_class"] == "unknown"  # RuntimeError
+    assert steps["response"]["status"] == "pending"
+    reader_calls_before = len(fakes["reader"].calls)
+    for name in ("response", "writing", "polishing"):
+        assert not fakes[name].calls, f"{name} 不应在 fail-fast 后被执行"
+
+    # 解除故障 → resume
+    monkeypatch.setattr(reviewer, "process", original_reviewer_process)
+    resume = await client.post(
+        f"/api/v1/coordinator/runs/{run_id}/resume", headers=headers
+    )
+    assert resume.status_code == 200, resume.text
+    resumed = resume.json()
+    assert resumed["run_id"] == run_id
+    assert resumed["result"]["status"] == "success", resumed["result"]
+
+    # 核心断言：reader 未重跑（checkpoint 载荷直接注入），下游补齐
+    assert len(fakes["reader"].calls) == reader_calls_before
+    for name in ("response", "writing", "polishing"):
+        assert fakes[name].calls, f"resume 后 {name} 应被执行"
+
+    detail2 = await client.get(f"/api/v1/coordinator/runs/{run_id}", headers=headers)
+    assert detail2.json()["status"] == "succeeded"
+
+    # 全绿后不可再 resume
+    again = await client.post(
+        f"/api/v1/coordinator/runs/{run_id}/resume", headers=headers
+    )
+    assert again.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_resume_rejects_plan_drift(db_isolated_client, runs_dir):
+    """计划漂移守卫：工作流编辑后 resume → 409，拒绝混合两代产出"""
+    client = db_isolated_client
+    user_id, headers = await _register_and_login(client)
+
+    wf = await client.post(
+        "/api/v1/workflows/",
+        json={
+            "name": "drift-test",
+            "nodes": [
+                {"id": "n1", "agent": "reader", "task": "t1"},
+                {"id": "n2", "agent": "reviewer", "task": "t2"},
+            ],
+            "edges": [{"source": "n1", "target": "n2"}],
+        },
+        headers=headers,
+    )
+    assert wf.status_code == 200, wf.text
+    workflow_id = wf.json()["id"]
+
+    rec = create_run(
+        user_id,
+        {"kind": "workflow", "workflow_id": workflow_id, "name": "drift-test"},
+        {},
+        [
+            {"agent": "reader", "request": {"task": "t1"}, "dependencies": []},
+            {
+                "agent": "reviewer",
+                "request": {"task": "t2"},
+                "dependencies": ["reader"],
+            },
+        ],
+    )
+    finalize_run(user_id, rec.run_id, status="failed", error="x")
+
+    # 编辑工作流（加一个节点）→ 签名失配
+    upd = await client.put(
+        f"/api/v1/workflows/{workflow_id}",
+        json={
+            "nodes": [
+                {"id": "n1", "agent": "reader", "task": "t1"},
+                {"id": "n2", "agent": "reviewer", "task": "t2"},
+                {"id": "n3", "agent": "polishing", "task": "t3"},
+            ],
+            "edges": [
+                {"source": "n1", "target": "n2"},
+                {"source": "n2", "target": "n3"},
+            ],
+        },
+        headers=headers,
+    )
+    assert upd.status_code == 200, upd.text
+
+    resp = await client.post(
+        f"/api/v1/coordinator/runs/{rec.run_id}/resume", headers=headers
+    )
+    assert resp.status_code == 409
+    assert "已变更" in resp.json()["detail"]
+
+    # 删除工作流 → 409
+    rec2 = create_run(
+        user_id,
+        {"kind": "workflow", "workflow_id": workflow_id, "name": "drift-test"},
+        {},
+        [
+            {"agent": "reader", "request": {"task": "t1"}, "dependencies": []},
+            {
+                "agent": "reviewer",
+                "request": {"task": "t2"},
+                "dependencies": ["reader"],
+            },
+        ],
+    )
+    finalize_run(user_id, rec2.run_id, status="failed", error="x")
+    # 先改回原计划避免签名拦截，再删除源工作流
+    await client.put(
+        f"/api/v1/workflows/{workflow_id}",
+        json={
+            "nodes": [
+                {"id": "n1", "agent": "reader", "task": "t1"},
+                {"id": "n2", "agent": "reviewer", "task": "t2"},
+            ],
+            "edges": [{"source": "n1", "target": "n2"}],
+        },
+        headers=headers,
+    )
+    await client.delete(f"/api/v1/workflows/{workflow_id}", headers=headers)
+    resp2 = await client.post(
+        f"/api/v1/coordinator/runs/{rec2.run_id}/resume", headers=headers
+    )
+    assert resp2.status_code == 409
+    assert "已删除" in resp2.json()["detail"]

@@ -50,6 +50,41 @@ from app.core.debugging import (
     generate_debug_report,
     quick_diagnose,
 )
+from app.core.runs import find_run_any_user
+
+
+def _hydrate_session_from_run(manager, session, record: dict) -> None:
+    """从失败的 run 记录注入 Phase-1 错误证据（可选链接，不自动完成任何阶段）
+
+    仅读取证据：错误原文 + 失败步骤/failure_class/attempts + 来源。
+    根因判断与后续阶段仍由人推进（grill 契约决策 #8）。
+    """
+    failed_steps = [s for s in record.get("steps", []) if s.get("status") == "failed"]
+    source = record.get("source") or {}
+    src_id = source.get("template_id") or source.get("workflow_id", "")
+    src_label = f"{source.get('kind')}:{src_id}"
+
+    lines = [
+        f"run={record.get('run_id')} status={record.get('status')} source={src_label}"
+    ]
+    if record.get("error"):
+        lines.append(f"run error: {record['error']}")
+    for s in failed_steps:
+        lines.append(
+            f"step {s.get('agent')} 失败 "
+            f"(class={s.get('failure_class') or 'unknown'}, "
+            f"attempts={s.get('attempts', 0)}): {s.get('error', '')}"
+        )
+    if not failed_steps:
+        lines.append(f"记录中无 failed 步骤（状态: {record.get('status')}）")
+
+    RootCauseInvestigator(session).read_error_message("\n".join(lines))
+    if not session.title or session.title == session.session_id:
+        first_failed = failed_steps[0]["agent"] if failed_steps else "unknown"
+        session.title = (
+            f"[run {record.get('run_id')}] {src_label} 步骤 {first_failed} 失败"
+        )
+    manager.save_session(session)
 
 
 def main():
@@ -65,6 +100,11 @@ def main():
     sess_sub = sess_parser.add_subparsers(dest="sess_action")
     create_parser = sess_sub.add_parser("create", help="创建会话")
     create_parser.add_argument("--title", default="", help="会话标题")
+    create_parser.add_argument(
+        "--from-run",
+        default=None,
+        help="从失败的 run 记录注入 Phase-1 证据（工作流运行记录 run_id）",
+    )
     sess_sub.add_parser("list", help="列出会话")
     show_parser = sess_sub.add_parser("show", help="查看会话")
     show_parser.add_argument("--session", required=True, help="会话 ID")
@@ -178,6 +218,15 @@ def main():
     if args.command == "session":
         if args.sess_action == "create":
             session = manager.create_session(args.title)
+            if getattr(args, "from_run", None):
+                try:
+                    record = find_run_any_user(args.from_run)
+                except ValueError:
+                    record = None
+                if not record:
+                    print(f"run 记录不存在: {args.from_run}")
+                    sys.exit(1)
+                _hydrate_session_from_run(manager, session, record)
             print(json.dumps(session.to_dict(), indent=2, ensure_ascii=False))
         elif args.sess_action == "list":
             print(json.dumps(manager.list_sessions(), indent=2, ensure_ascii=False))

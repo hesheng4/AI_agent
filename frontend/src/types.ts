@@ -225,6 +225,45 @@ export interface OrchestrateResponse {
   result: Record<string, unknown>;
 }
 
+// ===== 运行记录（E6 工作流恢复）=====
+export interface RunStepSummary {
+  agent: string;
+  status: string;
+}
+
+export interface RunSummary {
+  run_id: string;
+  status: string;
+  source: { kind: string; template_id?: string; workflow_id?: string; name?: string };
+  error: string;
+  created_at: string;
+  updated_at: string;
+  steps: RunStepSummary[];
+}
+
+export interface RunStep extends RunStepSummary {
+  result?: Record<string, unknown> | null;
+  error?: string;
+  failure_class?: string;
+  attempts?: number;
+  started_at?: string;
+  finished_at?: string;
+}
+
+export interface RunRecord extends RunSummary {
+  request: Record<string, unknown>;
+  plan_signature: string;
+  plan: Array<{ agent: string; task: string; dependencies: string[] }>;
+  steps: RunStep[];
+  task_ids: string[];
+}
+
+export interface ResumeResponse {
+  task_id: string;
+  run_id: string;
+  result: Record<string, unknown>;
+}
+
 // ===== 精读 =====
 export interface ReadFullRequest {
   content: string;

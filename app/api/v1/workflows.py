@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.agents.coordinator import get_coordinator_agent
 from app.api.deps import get_current_user
+from app.core.runs import create_run, finalize_run
 from app.core.workflows import (
     create_workflow,
     delete_workflow,
@@ -111,6 +112,28 @@ async def run(workflow_id: str, user: User = Depends(get_current_user)):
         task["request"]["_user_api_model"] = user.api_model
 
     # 复用 coordinator 的 DAG 调度引擎
-    results = await _coordinator._execute_plan_parallel(execution_plan)
+    # E6: 创建 run 记录（checkpoint），失败后可经 /coordinator/runs/{id}/resume 恢复
+    user_id = str(user.id)
+    recorder = create_run(
+        user_id=user_id,
+        source={
+            "kind": "workflow",
+            "workflow_id": workflow_id,
+            "name": wf.get("name", ""),
+        },
+        request={},
+        execution_plan=execution_plan,
+    )
+    results = await _coordinator._execute_plan_parallel(
+        execution_plan, run_recorder=recorder
+    )
     final = _coordinator._integrate_results(results)
-    return {"status": final.get("status", "done"), "results": final}
+    run_status = "failed" if final.get("failed_agents") else "succeeded"
+    finalize_run(
+        user_id, recorder.run_id, status=run_status, error=final.get("error", "")
+    )
+    return {
+        "status": final.get("status", "done"),
+        "run_id": recorder.run_id,
+        "results": final,
+    }

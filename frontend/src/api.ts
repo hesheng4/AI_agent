@@ -10,6 +10,9 @@ import type {
   UsageResponse,
   RouteResponse,
   OrchestrateResponse,
+  RunSummary,
+  RunRecord,
+  ResumeResponse,
   ReadFullRequest, ReadFullResponse,
   AssessRequest, AssessResponse, QuickCheckRequest, QuickCheckResponse,
   DraftResponseRequest, DraftResponseResult, AuditResponseRequest, AuditResponseResult,
@@ -662,6 +665,15 @@ export const coordinatorApi = {
       method: 'POST',
       body: JSON.stringify({ task, content, ...(taskId ? { task_id: taskId } : {}) }),
     }),
+};
+
+// ===== 运行记录 API（E6 工作流恢复）=====
+export const runsApi = {
+  list: () => request<{ runs: RunSummary[] }>('/coordinator/runs'),
+  detail: (runId: string) => request<RunRecord>(`/coordinator/runs/${runId}`),
+  /** 从失败步恢复：跳过已完成步，重执行 failed/pending 及其传递下游 */
+  resume: (runId: string) =>
+    request<ResumeResponse>(`/coordinator/runs/${runId}/resume`, { method: 'POST' }),
 };
 
 // ===== 精读 API =====

@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import UTC, datetime
 from typing import Any
 
 from app.agents.base import BaseAgent
@@ -9,12 +10,24 @@ from app.agents.coordinator.planner import (
     TaskPlanner,
 )
 from app.agents.registry import get_agent_registry
+from app.config import get_settings
 from app.core.events import event_bus
+from app.core.runs import (
+    RunRecorder,
+    classify_failure,
+    create_run,
+    finalize_run,
+)
 from app.core.tracing import span, trace_context
-from app.utils.exceptions import AgentException
+from app.utils.exceptions import AgentException, StepTimeoutError
 from app.utils.logger import get_logger
 
 logger = get_logger("agent.coordinator")
+
+
+def _sanitize_request(request: dict[str, Any]) -> dict[str, Any]:
+    """冻结请求快照：剔除 _ 前缀内部字段（_user_api_* 凭据不落盘 run 记录）"""
+    return {k: v for k, v in request.items() if not str(k).startswith("_")}
 
 _ROUTING_SYSTEM_PROMPT = (
     "你是研究Agent平台的路由器。根据用户意图，从能力清单中选出真正需要执行的 Agent。"
@@ -75,6 +88,7 @@ class CoordinatorAgent(BaseAgent):
             # 模板驱动：步骤顺序即执行顺序（前缀依赖），跳过关键词路由/
             # 上游补全/静态依赖分析；无模板路径保持原行为（零回归）
             template_id = request.get("workflow_template")
+            run_recorder: RunRecorder | None = None
             if template_id:
                 template = WORKFLOW_TEMPLATES.get(template_id)
                 self.planner.validate_template(template_id, template or {})
@@ -82,6 +96,14 @@ class CoordinatorAgent(BaseAgent):
                 agents_needed = [t["agent"] for t in subtasks]
                 logger.info(f"模板 {template_id!r} 展开为 {len(subtasks)} 步")
                 execution_plan = subtasks
+                # E6: 模板编排创建 run 记录（checkpoint），失败后可 resume
+                if request.get("_user_id"):
+                    run_recorder = create_run(
+                        user_id=request["_user_id"],
+                        source={"kind": "template", "template_id": template_id},
+                        request=_sanitize_request(request),
+                        execution_plan=execution_plan,
+                    )
             else:
                 agents_needed = self.planner.identify_agents(request)
                 if not agents_needed:
@@ -108,9 +130,24 @@ class CoordinatorAgent(BaseAgent):
                 t["_trace_id"] = tid
 
             results = await self._execute_plan_parallel(
-                execution_plan, task_id, fail_fast=bool(template_id)
+                execution_plan,
+                task_id,
+                fail_fast=bool(template_id),
+                run_recorder=run_recorder,
             )
             final_result = self._integrate_results(results, fail_fast=bool(template_id))
+            if run_recorder:
+                run_recorder.add_task_id(task_id)
+                run_status = (
+                    "failed" if final_result.get("failed_agents") else "succeeded"
+                )
+                finalize_run(
+                    request["_user_id"],
+                    run_recorder.run_id,
+                    status=run_status,
+                    error=final_result.get("error", ""),
+                )
+                final_result["run_id"] = run_recorder.run_id
             final_result["task_id"] = task_id
             final_result["trace_id"] = tid
 
@@ -120,35 +157,67 @@ class CoordinatorAgent(BaseAgent):
             return final_result
 
     async def _execute_plan_parallel(
-        self, execution_plan: list[dict], task_id: str = "", fail_fast: bool = False
+        self,
+        execution_plan: list[dict],
+        task_id: str = "",
+        fail_fast: bool = False,
+        run_recorder: RunRecorder | None = None,
+        completed_results: list[dict] | None = None,
     ) -> list[dict]:
         """并行执行计划，并将上游 Agent 结果注入下游任务请求
 
         fail_fast（模板驱动编排，Q12）：任一步失败即终止工作流，后续层级
         不执行；失败记入 results，由整合侧标 status=failed。非模板路径
         保持原语义（单任务异常直抛 / 多任务 partial_failure）。
+
+        E6 恢复：completed_results 为 resume 预注入的成功步骤
+        [{agent, result}] — 这些步不再执行，其载荷直接作为上游上下文；
+        run_recorder 提供时逐步落盘 checkpoint。
         """
-        results = []
-        completed = set()
+        results: list[dict] = []
+        completed: set[str] = set()
         context: dict[str, dict[str, Any]] = {}
+        for entry in completed_results or []:
+            agent_name = entry["agent"]
+            payload = entry.get("result") or {}
+            results.append(
+                {"agent": agent_name, "result": payload, "status": "success"}
+            )
+            completed.add(agent_name)
+            context[agent_name] = payload
 
         levels = self._group_by_level(execution_plan)
 
         for level_idx, level_tasks in enumerate(levels):
-            logger.info(f"执行第 {level_idx + 1} 层，{len(level_tasks)} 个任务")
+            pending_tasks = [t for t in level_tasks if t["agent"] not in completed]
+            if not pending_tasks:
+                continue
+            logger.info(
+                f"执行第 {level_idx + 1} 层，"
+                f"{len(pending_tasks)}/{len(level_tasks)} 个任务"
+            )
 
             prepared_tasks = [
-                self._inject_upstream(task, context) for task in level_tasks
+                self._inject_upstream(task, context) for task in pending_tasks
             ]
+            level_started_at = datetime.now(UTC).isoformat()
 
             if len(prepared_tasks) == 1:
                 task = prepared_tasks[0]
                 try:
-                    result = await self._execute_single_task(task)
+                    result = await self._execute_step(task)
                 except Exception as e:
                     if not fail_fast:
                         raise
                     logger.error(f"任务 {task['agent']} 失败，终止工作流: {e}")
+                    if run_recorder:
+                        run_recorder.step_finished(
+                            task["agent"],
+                            status="failed",
+                            error=str(e),
+                            failure_class=classify_failure(e),
+                            started_at=level_started_at,
+                        )
                     results.append(
                         {
                             "agent": task["agent"],
@@ -157,12 +226,19 @@ class CoordinatorAgent(BaseAgent):
                         }
                     )
                     break
+                if run_recorder:
+                    run_recorder.step_finished(
+                        task["agent"],
+                        status="success",
+                        result=result.get("result"),
+                        started_at=level_started_at,
+                    )
                 results.append(result)
                 completed.add(task["agent"])
                 if result.get("status") == "success":
                     context[task["agent"]] = result["result"]
             else:
-                tasks = [self._execute_single_task(t) for t in prepared_tasks]
+                tasks = [self._execute_step(t) for t in prepared_tasks]
                 level_results = await asyncio.gather(*tasks, return_exceptions=True)
 
                 level_failed = False
@@ -170,6 +246,14 @@ class CoordinatorAgent(BaseAgent):
                     task = prepared_tasks[i]
                     if isinstance(result, Exception):
                         logger.error(f"任务 {task['agent']} 失败: {result}")
+                        if run_recorder:
+                            run_recorder.step_finished(
+                                task["agent"],
+                                status="failed",
+                                error=str(result),
+                                failure_class=classify_failure(result),
+                                started_at=level_started_at,
+                            )
                         results.append(
                             {
                                 "agent": task["agent"],
@@ -179,6 +263,13 @@ class CoordinatorAgent(BaseAgent):
                         )
                         level_failed = True
                     else:
+                        if run_recorder:
+                            run_recorder.step_finished(
+                                task["agent"],
+                                status="success",
+                                result=result.get("result"),
+                                started_at=level_started_at,
+                            )
                         results.append(result)
                         if result.get("status") == "success":
                             context[task["agent"]] = result["result"]
@@ -188,6 +279,25 @@ class CoordinatorAgent(BaseAgent):
                     break
 
         return results
+
+    async def _execute_step(self, task: dict) -> dict:
+        """单步执行 + 步级墙钟超时（E6: AGENT_STEP_TIMEOUT，默认 600s）
+
+        超时合成为 StepTimeoutError（TimeoutError 子类 → 分类 transient），
+        走常规失败路径 checkpoint 落盘，卡死步从此可恢复。wait_for 会
+        取消内部协程，挂起的 agent 调用随之终止。timeout<=0 关闭超时。
+        """
+        timeout = get_settings().AGENT_STEP_TIMEOUT
+        if not timeout or timeout <= 0:
+            return await self._execute_single_task(task)
+        try:
+            return await asyncio.wait_for(
+                self._execute_single_task(task), timeout=timeout
+            )
+        except TimeoutError as e:  # 3.11+: asyncio.TimeoutError 别名
+            raise StepTimeoutError(
+                f"步骤 {task['agent']} 执行超过 {timeout}s 上限"
+            ) from e
 
     def _inject_upstream(self, task: dict, context: dict[str, dict[str, Any]]) -> dict:
         """将上游 Agent 的成功结果注入当前任务请求

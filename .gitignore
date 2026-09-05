@@ -50,6 +50,9 @@ ENV/
 .arts
 debug_sessions/
 
+# 运行时数据（E6 run 记录 / 工作流定义等，由应用按需创建）
+data/
+
 # 根目录一次性脚本与快照（外部技能库维护产物）
 _notes_part*.py
 _apply_notes.py

@@ -57,3 +57,11 @@ class ToolException(AppException):
         super().__init__(
             message=f"Tool[{tool_name}] {message}", code="TOOL_ERROR", status_code=500
         )
+
+
+class StepTimeoutError(TimeoutError):
+    """步骤级墙钟超时（工作流单步超过 AGENT_STEP_TIMEOUT）
+
+    继承 TimeoutError 而非 AppException：失败分类器据此归为
+    transient，checkpoint 落盘后可 resume 重试。
+    """

@@ -153,6 +153,13 @@ class Settings(BaseSettings):
     # 批量验证并发上限（礼貌池约束）
     CITATION_VERIFY_CONCURRENCY: int = 4
 
+    # ========== 工作流运行记录与恢复（E6，见 docs/plans/workflow-error-recovery-v1.md）==========
+    # 步级墙钟超时（秒）：防单步永久卡死；超时合成 StepTimeoutError
+    # → 分类 transient → 可 resume。0 或负值关闭步级超时（回退无限等待）。
+    AGENT_STEP_TIMEOUT: float = 600.0
+    # 每用户保留的 run 记录上限（cap-on-write，写入后裁剪最旧）
+    RUN_RETENTION_LIMIT: int = 50
+
     model_config = ConfigDict(
         env_file=".env",
         case_sensitive=True,
