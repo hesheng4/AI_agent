@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 from pydantic_settings import BaseSettings
 
 # 视为未修改的默认 SECRET_KEY，生产环境必须替换
@@ -157,6 +157,9 @@ class Settings(BaseSettings):
     # 步级墙钟超时（秒）：防单步永久卡死；超时合成 StepTimeoutError
     # → 分类 transient → 可 resume。0 或负值关闭步级超时（回退无限等待）。
     AGENT_STEP_TIMEOUT: float = 600.0
+    # 单工具墙钟超时（秒）：防外部工具挂起阻塞整个 agent 步。
+    # 直连 agent 调用不走步级超时，此值兜底。0 或负值关闭（回退无限等待）。
+    AGENT_TOOL_TIMEOUT: float = 300.0
     # 步级瞬态失败自动重试预算（仅 checkpointed run 的模板/自定义 DAG 路径）。
     # 默认 0 = opt-in：保持 v1 fail-fast 手动恢复语义（LLM 客户端请求级
     # 已有 429/超时退避重试，步级仍瞬态失败多为持续故障窗口，盲目重试
@@ -175,6 +178,28 @@ class Settings(BaseSettings):
         env_file=".env",
         case_sensitive=True,
     )
+
+    @field_validator("CACHE_BACKEND", "RATE_LIMIT_BACKEND")
+    @classmethod
+    def _validate_backend_choice(cls, v: str) -> str:
+        """后端值白名单：拼写错误（如 "Redis"）必须启动即失败。
+
+        旧实现里非法值会走工厂的 else 分支静默回退 memory 后端——
+        多实例部署下限流计数按进程分裂，安全属性无声降级。
+        Redis 运行期不可用的优雅降级不受影响（那是另一条路径）。
+        """
+        allowed = {"memory", "redis"}
+        if v not in allowed:
+            raise ValueError(f"后端选择必须是 {sorted(allowed)} 之一，收到: {v!r}")
+        return v
+
+    @field_validator("RATE_LIMIT_FALLBACK")
+    @classmethod
+    def _validate_rate_limit_fallback(cls, v: str) -> str:
+        allowed = {"allow", "deny"}
+        if v not in allowed:
+            raise ValueError(f"限流降级策略必须是 {sorted(allowed)} 之一，收到: {v!r}")
+        return v
 
     def validate_security(self) -> None:
         """启动期安全校验：非 DEBUG 模式下必须满足的安全基线"""

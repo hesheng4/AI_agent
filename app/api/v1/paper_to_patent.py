@@ -1,5 +1,7 @@
 """Nature-Paper-to-Patent API: 论文→中国发明专利"""
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -33,7 +35,7 @@ class PatentDraftRequest(BaseModel):
 @router.post("/draft")
 async def draft_patent(
     request: PatentDraftRequest, current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     """论文→中国发明专利草稿"""
     from app.agents.paper_to_patent.agent import PaperToPatentAgent
 

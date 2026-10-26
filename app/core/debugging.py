@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import subprocess
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -270,7 +271,7 @@ class DebugReport:
     """调试报告"""
 
     session: DebugSession = field(default_factory=DebugSession)
-    phase_checklist: dict[str, dict[str, bool]] = field(default_factory=dict)
+    phase_checklist: dict[str, dict[str, Any]] = field(default_factory=dict)
     recommendations: list[str] = field(default_factory=list)
     generated_at: str = ""
 
@@ -431,13 +432,13 @@ class RootCauseInvestigator:
         component_name: str,
         input_data: Any = None,
         output_data: Any = None,
-        config: dict[str, Any] = None,
+        config: dict[str, Any] | None = None,
     ) -> ErrorEvidence:
         """多组件系统中收集边界证据
 
         在每个组件边界记录: 什么数据进入、什么数据离开、环境/配置是否传递
         """
-        boundary = {
+        boundary: dict[str, Any] = {
             "component": component_name,
             "input": str(input_data)[:500] if input_data else "N/A",
             "output": str(output_data)[:500] if output_data else "N/A",
@@ -939,7 +940,7 @@ class DebugSessionManager:
 @contextmanager
 def boundary_trace(
     component_name: str, log_inputs: bool = True, log_outputs: bool = True
-):
+) -> Iterator[Any]:
     """边界追踪上下文管理器
 
     在组件边界添加诊断工具:
@@ -954,15 +955,15 @@ def boundary_trace(
     """
 
     class BoundaryTracer:
-        def __init__(self):
+        def __init__(self) -> None:
             self.name = component_name
             self.input = None
             self.output = None
-            self.error = None
+            self.error: str | None = None
             self.start_time = datetime.now().isoformat()
-            self.env_snapshot = {}
+            self.env_snapshot: dict[str, str] = {}
 
-        def capture_env(self, *var_names):
+        def capture_env(self, *var_names: str) -> None:
             for var in var_names:
                 self.env_snapshot[var] = "SET" if os.environ.get(var) else "UNSET"
 

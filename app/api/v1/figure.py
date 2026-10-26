@@ -36,7 +36,7 @@ class FigureQARequest(BaseModel):
 @router.post("/contract")
 async def create_contract(
     request: FigureContractRequest, current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     """创建 Figure Contract"""
     from app.agents.figure.agent import FigureAgent
 
@@ -57,7 +57,7 @@ async def create_contract(
 async def apply_style(
     journal: str = "generic",
     current_user: User = Depends(get_current_user),
-):
+) -> dict[str, Any]:
     """应用期刊级 matplotlib 样式"""
     from app.agents.figure.agent import FigureAgent
 
@@ -68,7 +68,7 @@ async def apply_style(
 @router.post("/qa")
 async def qa_check(
     request: FigureQARequest, current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     """Figure QA 检查"""
     from app.agents.figure.agent import FigureAgent
 

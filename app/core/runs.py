@@ -255,24 +255,9 @@ def get_run(user_id: str, run_id: str) -> dict[str, Any] | None:
     return _read_run(user_id, run_id)
 
 
-def find_run_any_user(run_id: str) -> dict[str, Any] | None:
-    """按 run_id 跨用户查找记录 — 仅限本机运维/CLI 场景（无鉴权语境）
-
-    API 侧一律走 get_run(user_id, ...)，不得使用本函数。
-    """
-    _ensure_dir()
-    _validate_run_id(run_id)
-    suffix = f"_{run_id}.json"
-    for f in _RUNS_DIR.iterdir():
-        if not f.name.endswith(suffix):
-            continue
-        try:
-            data: dict[str, Any] = json.loads(f.read_text(encoding="utf-8"))
-            return data
-        except Exception as e:
-            logger.warning(f"run 记录解析失败: {f.name}, err={e}")
-            return None
-    return None
+# 历史：此处曾有 find_run_any_user(run_id) 跨用户查找入口（注释称
+# 「仅限运维/CLI，API 不得使用」）。全仓无调用方，属越权读取隐患，
+# 已移除（credibility-convergence 批次二 triage）。
 
 
 def list_run_summaries(user_id: str) -> list[dict[str, Any]]:

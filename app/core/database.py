@@ -1,4 +1,11 @@
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from collections.abc import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import get_settings
@@ -22,7 +29,7 @@ class Base(DeclarativeBase):
     pass
 
 
-async def get_db():
+async def get_db() -> AsyncGenerator[AsyncSession]:
     async with async_session() as session:
         try:
             yield session
@@ -35,7 +42,7 @@ async def get_db():
             await session.close()
 
 
-def get_async_engine():
+def get_async_engine() -> AsyncEngine:
     """返回全局 engine（供 health check 等场景取用）"""
     return engine
 

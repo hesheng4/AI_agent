@@ -482,7 +482,11 @@ async def test_orchestrate_accepts_workflow_template_over_http(
     不依赖用例执行顺序；结束后清理实例缓存。
     runs_dir：E6 起模板编排会落 run 记录，隔离到临时目录防污染真实存储。
     """
-    coordinator = get_coordinator_agent()
+    # 对路由模块 import 期捕获的单例打桩（get_coordinator_agent() 若因
+    # 其他用例清过 lru_cache 会拿到不同实例，HTTP 请求打不到桩上）
+    from app.api.v1.coordinator import _agent as route_agent
+
+    coordinator = route_agent
     coordinator._agent_instances.clear()
 
     coord_fake = FakeLLM(route_agents=["literature"])
@@ -544,6 +548,85 @@ async def test_orchestrate_accepts_workflow_template_over_http(
         assert (
             template_agents <= used
         ), f"HTTP 编排未按模板展开: 缺失 {template_agents - used}"
+    finally:
+        coordinator._agent_instances.clear()
+
+
+@pytest.mark.asyncio
+async def test_orchestrate_save_artifact_persists_result(
+    db_isolated_client, runs_dir, monkeypatch
+):
+    """save_artifact=true：编排最终结果持久化为产出物，可经 /artifacts 重新导出。
+
+    结果持久化链路（credibility-convergence 步骤 6）：请求体 opt-in →
+    协调器编排完成 → agent_artifacts 落库 → 用户随时回看/导出。
+    """
+    # 对路由模块 import 期捕获的单例打桩（get_coordinator_agent() 若因
+    # 其他用例清过 lru_cache 会拿到不同实例，HTTP 请求打不到桩上）
+    from app.api.v1.coordinator import _agent as route_agent
+
+    coordinator = route_agent
+    coordinator._agent_instances.clear()
+
+    coord_fake = FakeLLM(route_agents=["literature"])
+    coord_fake._agent_name = "coordinator"
+    monkeypatch.setattr(coordinator, "llm", coord_fake)
+
+    for name in ("reader", "reviewer", "response", "writing", "polishing"):
+        agent = coordinator.get_agent(name)
+        fake = FakeLLM()
+        fake._agent_name = name
+        monkeypatch.setattr(agent, "llm", fake)
+
+    try:
+        email, username = _unique_creds()
+        reg = await db_isolated_client.post(
+            "/api/v1/auth/register",
+            json={"email": email, "username": username, "password": _PASSWORD},
+        )
+        assert reg.status_code == 200, reg.text
+        login = await db_isolated_client.post(
+            "/api/v1/auth/login", json={"email": email, "password": _PASSWORD}
+        )
+        token = login.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        resp = await db_isolated_client.post(
+            "/api/v1/coordinator/orchestrate",
+            headers=headers,
+            json={
+                "task": "根据审稿意见修订论文",
+                "content": "# Abstract\nsave_artifact 冒烟稿件占位。",
+                "workflow_template": "revise",
+                "save_artifact": True,
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        final = resp.json()["result"]
+        assert final.get("artifact_saved") is True, final
+
+        # 经 /artifacts 可取回（user_id 隔离：只有本人可见）
+        listed = await db_isolated_client.get("/api/v1/artifacts/", headers=headers)
+        assert listed.status_code == 200, listed.text
+        items = listed.json()
+        assert len(items) == 1, items
+        assert items[0]["agent"] == "coordinator"
+        assert items[0]["payload"]["task_id"] == final["task_id"]
+
+        # 不传 save_artifact（默认 False）→ 不产生新产出物
+        resp = await db_isolated_client.post(
+            "/api/v1/coordinator/orchestrate",
+            headers=headers,
+            json={
+                "task": "根据审稿意见修订论文",
+                "content": "# Abstract\nsave_artifact 冒烟稿件占位。",
+                "workflow_template": "revise",
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        assert "artifact_saved" not in resp.json()["result"]
+        listed = await db_isolated_client.get("/api/v1/artifacts/", headers=headers)
+        assert len(listed.json()) == 1
     finally:
         coordinator._agent_instances.clear()
 

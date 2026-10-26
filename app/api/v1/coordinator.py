@@ -45,6 +45,10 @@ class OrchestrateRequest(RouteRequest):
         description="工作流模板 id（如 write_from_scratch / revise）。"
         "提供时按模板步骤逐步编排，缺省走意图路由",
     )
+    save_artifact: bool = Field(
+        default=False,
+        description="编排完成后把最终结果保存为产出物（结果持久化，可随时重新导出）",
+    )
 
     @field_validator("workflow_template")
     @classmethod
@@ -67,19 +71,21 @@ class RouteResponse(BaseModel):
 
 
 @router.get("/capability-map", response_model=RouteResponse)
-async def capability_map(user: User = Depends(get_current_user)):
+async def capability_map(user: User = Depends(get_current_user)) -> RouteResponse:
     """返回 16 skill 能力地图"""
     return RouteResponse(result=_agent.capability_map())
 
 
 @router.get("/workflow-templates", response_model=RouteResponse)
-async def workflow_templates(user: User = Depends(get_current_user)):
+async def workflow_templates(user: User = Depends(get_current_user)) -> RouteResponse:
     """返回 4 条工作流模板"""
     return RouteResponse(result=_agent.workflow_templates())
 
 
 @router.post("/route", response_model=RouteResponse)
-async def route_request(req: RouteRequest, user: User = Depends(get_current_user)):
+async def route_request(
+    req: RouteRequest, user: User = Depends(get_current_user)
+) -> RouteResponse:
     """意图识别 → 单 agent 路由"""
     result = await _agent.process_simple(
         {
@@ -95,7 +101,7 @@ async def route_request(req: RouteRequest, user: User = Depends(get_current_user
 @router.post("/orchestrate", response_model=OrchestrateResponse)
 async def orchestrate_request(
     req: OrchestrateRequest, user: User = Depends(get_current_user)
-):
+) -> OrchestrateResponse:
     """多 Agent 编排 — 完整 process()：关键词规划 + 上游补全 + 拓扑分层并行
 
     与 /route（单 Agent）互补。执行期间事件发布到 task_id 对应的

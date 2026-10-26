@@ -18,15 +18,12 @@ export default defineConfig({
         // 预缓存上限 2MB（超出走 runtime caching）
         maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
         runtimeCaching: [
-          // API GET 请求 — NetworkFirst（优先网络，离线降级缓存）
+          // API 响应一律不落盘缓存（隐私）：/auth/me、/billing/usage、
+          // /library/papers 等已认证私人响应写入 Cache Storage 后，
+          // 共享机器上离线 5 分钟内可读。API 可用性由网络层保证。
           {
             urlPattern: /^https?:\/\/[^/]*\/api\/v1\/.*$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 5 }, // 5min
-              networkTimeoutSeconds: 3, // 3s 超时降级缓存
-            },
+            handler: 'NetworkOnly',
           },
           // 字体 — CacheFirst（长期缓存）
           {

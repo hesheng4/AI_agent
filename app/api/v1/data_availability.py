@@ -65,7 +65,7 @@ class SelectRepositoryResponse(BaseModel):
 @router.post("/generate-statement", response_model=GenerateStatementResponse)
 async def generate_statement(
     request: GenerateStatementRequest, current_user: User = Depends(get_current_user)
-):
+) -> GenerateStatementResponse:
     """生成数据可用性声明"""
     logger.info(f"用户 {current_user.id} 生成数据可用性声明")
 
@@ -91,7 +91,7 @@ async def generate_statement(
 @router.post("/audit-statement", response_model=AuditStatementResponse)
 async def audit_statement(
     request: AuditStatementRequest, current_user: User = Depends(get_current_user)
-):
+) -> AuditStatementResponse:
     """审计数据可用性声明的 FAIR 合规性"""
     logger.info(f"用户 {current_user.id} 审计数据可用性声明")
 
@@ -110,7 +110,7 @@ async def audit_statement(
 @router.post("/select-repository", response_model=SelectRepositoryResponse)
 async def select_repository(
     request: SelectRepositoryRequest, current_user: User = Depends(get_current_user)
-):
+) -> SelectRepositoryResponse:
     """推荐数据仓库"""
     logger.info(f"用户 {current_user.id} 推荐数据仓库: 类型={request.data_type}")
 

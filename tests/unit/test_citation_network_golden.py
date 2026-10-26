@@ -14,7 +14,6 @@
   算法：对每篇被引文献 Z，其施引者集合 reverse_adj[Z] 两两配对
 """
 
-import pytest
 
 from app.services.citation_network import CitationNetwork
 

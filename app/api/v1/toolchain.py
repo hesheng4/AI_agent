@@ -120,7 +120,7 @@ class RecommendedConfigRequest(BaseModel):
 
 
 @router.get("/status")
-async def toolchain_status():
+async def toolchain_status() -> dict[str, Any]:
     """推理工具链状态"""
     return {
         "module": "ascend_toolchain",
@@ -149,7 +149,7 @@ async def toolchain_status():
 
 
 @router.get("/hardware-check")
-async def hardware_check():
+async def hardware_check() -> dict[str, Any]:
     """执行 NPU 硬件检查
 
     遵循 quantify-agent skill 规范：在每次推理任务开始前执行。
@@ -159,7 +159,7 @@ async def hardware_check():
 
 
 @router.get("/env-setup")
-async def env_setup(device_ids: str = "0,1,2,3"):
+async def env_setup(device_ids: str = "0,1,2,3") -> dict[str, Any]:
     """获取推荐的公共环境变量"""
     env_vars = get_common_env_setup(device_ids)
     return {
@@ -173,7 +173,7 @@ async def env_setup(device_ids: str = "0,1,2,3"):
 
 
 @router.get("/verify-environment")
-async def verify_environment():
+async def verify_environment() -> dict[str, Any]:
     """验证完整的昇腾推理环境
 
     检查 CANN、NPU Driver、torch_npu、vllm_ascend、msmodelslim 安装状态
@@ -183,14 +183,14 @@ async def verify_environment():
 
 
 @router.get("/vllm-install-guide")
-async def vllm_install_guide():
+async def vllm_install_guide() -> dict[str, Any]:
     """获取 vLLM-Ascend 安装指引"""
     guide = get_vllm_install_guide()
     return guide.to_dict()
 
 
 @router.post("/vllm-launch")
-async def vllm_launch(req: VLLMLaunchRequest):
+async def vllm_launch(req: VLLMLaunchRequest) -> dict[str, Any]:
     """生成 vLLM-Ascend 启动命令
 
     包含环境变量设置和优化参数。
@@ -225,7 +225,7 @@ async def vllm_launch(req: VLLMLaunchRequest):
 
 
 @router.post("/vllm-diagnose")
-async def vllm_diagnose(req: VLLMDiagnoseRequest):
+async def vllm_diagnose(req: VLLMDiagnoseRequest) -> dict[str, Any]:
     """诊断 vLLM-Ascend 运行错误"""
     diagnoses = diagnose_vllm_error(req.error_output)
     return {
@@ -237,7 +237,7 @@ async def vllm_diagnose(req: VLLMDiagnoseRequest):
 
 
 @router.post("/quantize")
-async def quantize(req: QuantizationRequest):
+async def quantize(req: QuantizationRequest) -> dict[str, Any]:
     """生成 msmodelslim 量化脚本
 
     量化为端到端迭代流程：
@@ -291,7 +291,7 @@ async def quantize(req: QuantizationRequest):
 
 
 @router.post("/sensitivity")
-async def sensitivity(req: SensitivityRequest):
+async def sensitivity(req: SensitivityRequest) -> dict[str, Any]:
     """生成敏感度分析脚本
 
     用于诊断量化精度下降，逐层分析敏感度。
@@ -320,7 +320,7 @@ async def sensitivity(req: SensitivityRequest):
 
 
 @router.post("/aisbench")
-async def aisbench(req: AISBenchRequest):
+async def aisbench(req: AISBenchRequest) -> dict[str, Any]:
     """生成 AISBench 评测脚本
 
     需要vLLM 服务已启动。
@@ -346,7 +346,7 @@ async def aisbench(req: AISBenchRequest):
 
 
 @router.post("/recommended-config")
-async def recommended_config(req: RecommendedConfigRequest):
+async def recommended_config(req: RecommendedConfigRequest) -> dict[str, Any]:
     """根据模型和硬件生成推荐的 vLLM 运行配置"""
     try:
         arch = ModelArchitecture(req.model_arch)
@@ -380,7 +380,7 @@ async def recommended_config(req: RecommendedConfigRequest):
 
 
 @router.get("/quick-reference")
-async def quick_reference():
+async def quick_reference() -> dict[str, Any]:
     """推理工具链快速参考"""
     return {
         "workflow": [

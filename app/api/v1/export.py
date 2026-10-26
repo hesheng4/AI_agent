@@ -27,7 +27,7 @@ class PapersExportRequest(BaseModel):
 @router.post("/csv")
 async def export_csv(
     request: ExportRequest, current_user: User = Depends(get_current_user)
-):
+) -> Response:
     """导出CSV"""
     logger.info(f"用户 {current_user.id} 导出CSV")
 
@@ -45,7 +45,7 @@ async def export_csv(
 @router.post("/json")
 async def export_json(
     request: ExportRequest, current_user: User = Depends(get_current_user)
-):
+) -> Response:
     """导出JSON"""
     logger.info(f"用户 {current_user.id} 导出JSON")
 
@@ -63,7 +63,7 @@ async def export_json(
 @router.post("/bibtex")
 async def export_bibtex(
     request: PapersExportRequest, current_user: User = Depends(get_current_user)
-):
+) -> Response:
     """导出BibTeX"""
     logger.info(f"用户 {current_user.id} 导出BibTeX")
 
@@ -81,7 +81,7 @@ async def export_bibtex(
 @router.post("/ris")
 async def export_ris(
     request: PapersExportRequest, current_user: User = Depends(get_current_user)
-):
+) -> Response:
     """导出RIS"""
     logger.info(f"用户 {current_user.id} 导出RIS")
 
@@ -99,7 +99,7 @@ async def export_ris(
 @router.post("/markdown")
 async def export_markdown(
     request: ExportRequest, current_user: User = Depends(get_current_user)
-):
+) -> Response:
     """导出Markdown表格"""
     logger.info(f"用户 {current_user.id} 导出Markdown")
 

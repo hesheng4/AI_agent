@@ -26,7 +26,6 @@ from scipy import stats as sps  # noqa: E402
 from app.services.power_analysis import PowerAnalysis  # noqa: E402
 from app.services.statistics import StatisticsEnhancer as S  # noqa: E402
 
-
 # --------------------------------------------------------------------------
 # P0-1 标准正态 CDF
 # --------------------------------------------------------------------------

@@ -46,7 +46,7 @@ JOURNAL_FORMATS = {
 class ReaderAgent(BaseAgent):
     """全文中英对照 Markdown Reader Agent"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="reader",
             tools=[
@@ -115,12 +115,12 @@ class ReaderAgent(BaseAgent):
         figure_index = 0
         table_index = 0
 
-        def _mark_figure(m):
+        def _mark_figure(m: re.Match[str]) -> str:
             nonlocal figure_index
             figure_index += 1
             return f"\n\n[FIGURE {figure_index}]\n\n"
 
-        def _mark_table(m):
+        def _mark_table(m: re.Match[str]) -> str:
             nonlocal table_index
             table_index += 1
             return f"\n\n[TABLE {table_index}]\n\n"
@@ -154,7 +154,7 @@ class ReaderAgent(BaseAgent):
 
         segments = []
         current_section = "preamble"
-        para_buffer = []
+        para_buffer: list[str] = []
         para_index = 0
 
         for line in lines:
@@ -422,7 +422,7 @@ class ReaderAgent(BaseAgent):
             return {"error": "需安装 PyMuPDF: pip install pymupdf", "pages": []}
 
     @staticmethod
-    def crop_figure(page, rect, output_path: str) -> str:
+    def crop_figure(page: Any, rect: Any, output_path: str) -> str:
         """裁剪图表区域并保存"""
         try:
             pix = page.get_pixmap(clip=rect)

@@ -18,7 +18,7 @@ class ResponseAgent(BaseAgent):
     - revise: 修改回复信
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(name="response", tools=["draft", "audit", "revise"])
 
     async def process(self, request: dict[str, Any]) -> dict[str, Any]:
@@ -95,7 +95,7 @@ class ResponseAgent(BaseAgent):
         }
 
     @staticmethod
-    def _derive_comments(review_result: dict) -> dict:
+    def _derive_comments(review_result: dict[str, Any]) -> dict[str, Any]:
         """从 reviewer 结构化结果（improvement_suggestions）派生审稿意见与决策类型
 
         B3 串联：reviewer.assess 输出的 improvement_suggestions 每项含
@@ -193,7 +193,7 @@ class ResponseAgent(BaseAgent):
     ]
 
     @staticmethod
-    def assign_item_ids(comments: list[dict]) -> list[dict]:
+    def assign_item_ids(comments: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """为 editor/reviewer 意见分配结构化 ID (E.1, R1.1, R2.1)"""
         result = []
         e_count = 0
@@ -210,7 +210,7 @@ class ResponseAgent(BaseAgent):
             result.append(item)
         return result
 
-    async def run_10_step_workflow(self, request: dict) -> dict:
+    async def run_10_step_workflow(self, request: dict[str, Any]) -> dict[str, Any]:
         """完整10步工作流实现"""
         # Step 1: 识别模式
         mode = request.get("task_mode", "draft")
@@ -221,7 +221,11 @@ class ResponseAgent(BaseAgent):
         editor_items = [c for c in assigned if c.get("item_id", "").startswith("E.")]
         reviewer_items = [c for c in assigned if c.get("item_id", "").startswith("R")]
         # Step 4: 分类
-        classified = {"major": [], "minor": [], "clarification": []}
+        classified: dict[str, list[dict[str, Any]]] = {
+            "major": [],
+            "minor": [],
+            "clarification": [],
+        }
         for item in assigned:
             sev = item.get("severity", "minor")
             classified.get(sev, classified["minor"]).append(item)

@@ -1,5 +1,6 @@
 """Models module"""
 
+from app.models.artifacts import AgentArtifact
 from app.models.billing import PlanType, UsageRecord, UserAccount
 from app.models.library import (
     CitationRelation,
@@ -8,6 +9,7 @@ from app.models.library import (
     PaperTag,
     ReadingNote,
 )
+from app.models.shares import ShareLink
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -21,4 +23,6 @@ __all__ = [
     "PaperTag",
     "CitationRelation",
     "ReadingNote",
+    "AgentArtifact",
+    "ShareLink",
 ]

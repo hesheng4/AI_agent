@@ -2,6 +2,7 @@
 验证两层防御：
 1. 全局中间件：Content-Length > MAX_REQUEST_BODY_BYTES → 413
 2. Pydantic Field：content 超 max_length → 422（Pydantic 验证错误）
+3. chunked 传输（无 Content-Length）→ 411（防 2MB 上限被绕过）
 """
 
 import pytest
@@ -18,8 +19,10 @@ def settings():
 
 @pytest.fixture
 def app(settings):
-    """构造一个最小 app，仅挂载 S2 中间件 + 一个测试路由，避免依赖完整初始化。"""
+    """构造一个最小 app，仅挂载 S2 中间件 + 一个测试路由，避免依赖完整初始化。
+    中间件逻辑与 app/main.py 的 limit_request_body 保持一致。"""
     from fastapi import APIRouter
+    from fastapi.responses import JSONResponse
     from pydantic import BaseModel, Field
 
     application = FastAPI()
@@ -27,10 +30,15 @@ def app(settings):
 
     @application.middleware("http")
     async def limit_request_body(request, call_next):
-        from fastapi.responses import JSONResponse
-
         cl = request.headers.get("Content-Length")
-        if cl is not None:
+        if cl is None:
+            te = request.headers.get("Transfer-Encoding", "")
+            if "chunked" in te.lower() and request.method in ("POST", "PUT", "PATCH"):
+                return JSONResponse(
+                    status_code=411,
+                    content={"detail": "请使用 Content-Length 声明请求体大小"},
+                )
+        else:
             try:
                 if int(cl) > max_body:
                     return JSONResponse(
@@ -120,3 +128,86 @@ def test_invalid_content_length_ignored(app):
     )
     # 非法 CL 不触发 413，下游正常处理（可能 200 或其他）
     assert resp.status_code != 413
+
+
+def test_chunked_transfer_rejected_411(app):
+    """chunked 传输（无 Content-Length）→ 411。
+
+    回归：chunked 请求没有 Content-Length，旧实现直接放行，
+    是 2MB 上限的完整绕过路径（内存耗尽防护失效）。
+    httpx 会吞掉手动设置的 Transfer-Encoding 头，因此用裸 ASGI scope 直呼。
+    """
+
+    async def _call() -> int:
+        status_box = {}
+
+        async def receive():
+            return {"type": "http.request", "body": b'{"content":"x"}', "more_body": False}
+
+        async def send(message):
+            if message["type"] == "http.response.start":
+                status_box["status"] = message["status"]
+
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": "/echo",
+            "raw_path": b"/echo",
+            "query_string": b"",
+            "root_path": "",
+            "headers": [
+                (b"host", b"test"),
+                (b"content-type", b"application/json"),
+                (b"transfer-encoding", b"chunked"),
+            ],
+            "client": ("test", 123),
+            "server": ("test", 80),
+        }
+        await app(scope, receive, send)
+        return status_box["status"]
+
+    import asyncio
+
+    assert asyncio.run(_call()) == 411
+
+
+def test_chunked_uppercase_transfer_encoding_rejected_411(app):
+    """Transfer-Encoding 大小写不敏感（HTTP 头值大小写无意义）。"""
+
+    async def _call() -> int:
+        status_box = {}
+
+        async def receive():
+            return {"type": "http.request", "body": b'{"content":"x"}', "more_body": False}
+
+        async def send(message):
+            if message["type"] == "http.response.start":
+                status_box["status"] = message["status"]
+
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": "/echo",
+            "raw_path": b"/echo",
+            "query_string": b"",
+            "root_path": "",
+            "headers": [
+                (b"host", b"test"),
+                (b"content-type", b"application/json"),
+                (b"transfer-encoding", b"Chunked"),
+            ],
+            "client": ("test", 123),
+            "server": ("test", 80),
+        }
+        await app(scope, receive, send)
+        return status_box["status"]
+
+    import asyncio
+
+    assert asyncio.run(_call()) == 411

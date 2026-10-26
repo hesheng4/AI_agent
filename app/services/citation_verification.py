@@ -113,7 +113,7 @@ def _year_from_reference(reference: str) -> int | None:
     return int(m.group(0)) if m else None
 
 
-def _crossref_authors(message: dict) -> list[str]:
+def _crossref_authors(message: dict[str, Any]) -> list[str]:
     out = []
     for a in message.get("author") or []:
         name = " ".join(x for x in (a.get("given"), a.get("family")) if x)
@@ -122,7 +122,7 @@ def _crossref_authors(message: dict) -> list[str]:
     return out
 
 
-def _crossref_year(message: dict) -> int | None:
+def _crossref_year(message: dict[str, Any]) -> int | None:
     for key in ("published-print", "published-online", "issued", "created"):
         parts = (message.get(key) or {}).get("date-parts") or [[]]
         for p in parts:

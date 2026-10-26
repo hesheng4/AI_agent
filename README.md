@@ -29,7 +29,9 @@
 | 投稿打包 | `submission_package` | 期刊投稿材料整合打包 | ✅ |
 | 数据可用性 | `submission_package` | 数据可用性声明生成 | ✅ |
 | 数据导出 | — | CSV / BibTeX / RIS / Word / LaTeX / 多格式论文导出 | ✅ |
-| 计费管理 | — | 套餐限制、用量统计、API 调用频率控制 | ✅ |
+| 结果持久化 | `artifacts` | Agent 产出物保存/列表/筛选/重新导出/删除（`agent_artifacts` 表） | ✅ |
+| 分享与 fork | `shares` | 整库分享链接（token 哈希 + TTL + 撤销）+ fork 深拷贝（分类/标签/文献/笔记/引用全量重建） | ✅ |
+| 计费管理 | — | 套餐限制、用量统计、API 调用频率控制、**月度配额强制**（超额 429） | ✅ |
 
 #### 昇腾工作台（本地化推理）
 
@@ -285,7 +287,7 @@ research-agent-platform/
 │   └── versions/
 │       └── 6ab33371ef5b_initial_baseline.py  # 初始 baseline（8 表 + 10 索引）
 ├── alembic.ini                # Alembic 配置
-├── tests/                     # 测试（545 passed / 1 skipped，2026-09-07 实测）
+├── tests/                     # 测试（567 passed / 1 skipped，2026-10-26 实测；mypy 基线 890 → 58）
 │   ├── unit/                 # 单元测试（含数值黄金测试，见下）
 │   │   ├── test_numerical_golden.py        # 数值黄金测试：scipy 为 oracle 校验手写统计/功效实现
 │   │   └── test_citation_network_golden.py # 引用网络黄金测试：受控图解析解对照
@@ -547,6 +549,58 @@ Authorization: Bearer <token>
 
 # 获取用量统计
 GET /api/v1/billing/usage
+Authorization: Bearer <token>
+```
+
+### 产出物接口（结果持久化）
+
+```bash
+# 保存 Agent 产出物（payload JSON 透传）
+POST /api/v1/artifacts
+Authorization: Bearer <token>
+{ "agent": "reviewer", "title": "审稿报告 v1", "payload": {...} }
+
+# 列表（支持 ?agent= 筛选，按创建时间倒序）
+GET /api/v1/artifacts
+Authorization: Bearer <token>
+
+# 重新导出（单条读取）
+GET /api/v1/artifacts/{artifact_id}
+Authorization: Bearer <token>
+
+# 删除
+DELETE /api/v1/artifacts/{artifact_id}
+Authorization: Bearer <token>
+```
+
+### 分享与 fork 接口
+
+> 安全纪律：DB 只存 `sha256(token)`，明文 token **仅在创建响应中返回一次**；
+> TTL 默认 7 天（可永久）；接收方必须登录，不静默降级为公开。
+> fork 为全量深拷贝：分类/标签按名字重建、文献逐条 `add_paper`（计数同步）、
+> 笔记随文献、引用关系按 paper_id 映射重连。
+
+```bash
+# 创建分享（library 整库 / artifact 单产出物）
+POST /api/v1/shares
+Authorization: Bearer <token>
+{ "resource_type": "library", "ttl_days": 7 }
+# → { "id": "...", "token": "明文token仅此一次", "expires_at": "..." }
+
+# 我创建的分享
+GET /api/v1/shares
+Authorization: Bearer <token>
+
+# 撤销（仅 owner）
+DELETE /api/v1/shares/{share_id}
+Authorization: Bearer <token>
+
+# 接收方预览（须登录）
+GET /api/v1/shares/by-token/{token}
+Authorization: Bearer <token>
+
+# fork 到我的文献库（返回各项拷贝计数）
+POST /api/v1/shares/by-token/{token}/fork
 Authorization: Bearer <token>
 ```
 

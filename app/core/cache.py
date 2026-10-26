@@ -11,6 +11,7 @@
 import hashlib
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -24,7 +25,7 @@ class CacheBackend(ABC):
     """缓存后端抽象基类"""
 
     @abstractmethod
-    def _make_key(self, prefix: str, params: dict) -> str:
+    def _make_key(self, prefix: str, params: dict[str, Any]) -> str:
         """根据前缀和参数生成缓存 key（同步，纯计算）"""
 
     @abstractmethod
@@ -44,7 +45,7 @@ class CacheBackend(ABC):
         """清空缓存，可按前缀；返回清除条目数"""
 
     @abstractmethod
-    async def stats(self) -> dict:
+    async def stats(self) -> dict[str, Any]:
         """缓存统计"""
 
 
@@ -72,7 +73,7 @@ def _stable_repr(obj: Any) -> str:
         return f"{type_name}:{hashlib.md5(content.encode()).hexdigest()[:16]}"
 
 
-def _hash_key(prefix: str, params: dict) -> str:
+def _hash_key(prefix: str, params: dict[str, Any]) -> str:
     """统一的 key 生成逻辑：prefix:md5(stable_repr(params))[:CACHE_KEY_HASH_LENGTH]"""
     param_str = _stable_repr(params)
     hash_val = hashlib.md5(param_str.encode()).hexdigest()[:CACHE_KEY_HASH_LENGTH]
@@ -93,12 +94,12 @@ class MemoryCache(CacheBackend):
     CLEANUP_INTERVAL_SECONDS = 60
 
     def __init__(self, default_ttl: int = 3600, max_size: int = 10000):
-        self._cache: dict[str, dict] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
         self.default_ttl = default_ttl
         self.max_size = max_size
         self._last_cleanup: datetime = datetime.now()
 
-    def _make_key(self, prefix: str, params: dict) -> str:
+    def _make_key(self, prefix: str, params: dict[str, Any]) -> str:
         return _hash_key(prefix, params)
 
     async def get(self, key: str) -> Any | None:
@@ -157,7 +158,7 @@ class MemoryCache(CacheBackend):
         logger.info(f"清空缓存: {count}条")
         return count
 
-    async def stats(self) -> dict:
+    async def stats(self) -> dict[str, Any]:
         now = datetime.now()
         active = sum(1 for v in self._cache.values() if now <= v["expires"])
         expired = len(self._cache) - active
@@ -180,7 +181,7 @@ class RedisCache(CacheBackend):
         self.key_prefix = key_prefix
         self.default_ttl = default_ttl
 
-    def _redis(self):
+    def _redis(self) -> Any:
         # 延迟获取，避免模块加载时 Redis 未初始化
         from app.core.redis_client import get_redis
 
@@ -190,7 +191,7 @@ class RedisCache(CacheBackend):
         # 用户传入的 key 已含前缀（如 llm:abc123），再加全局前缀避免与其他服务冲突
         return f"{self.key_prefix}{key}"
 
-    def _make_key(self, prefix: str, params: dict) -> str:
+    def _make_key(self, prefix: str, params: dict[str, Any]) -> str:
         return _hash_key(prefix, params)
 
     async def get(self, key: str) -> Any | None:
@@ -243,7 +244,7 @@ class RedisCache(CacheBackend):
             logger.warning(f"Redis clear 失败，静默跳过: {e}")
         return count
 
-    async def stats(self) -> dict:
+    async def stats(self) -> dict[str, Any]:
         client = self._redis()
         if client is None:
             return {
@@ -298,15 +299,21 @@ def _create_cache() -> CacheBackend:
 cache = _create_cache()
 
 
-def cached(prefix: str, ttl: int | None = None):
+def cached(
+    prefix: str, ttl: int | None = None
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """缓存装饰器（async 函数专用）
 
     实例方法检测：通过 inspect.signature 的第一个参数名是否为 self/cls 判断。
     实例方法会跳过 args[0] 以避免每个实例的缓存互不共享。
+
+    注意（S4 安全纪律）：缓存 key 由 prefix + 参数的 _stable_repr 构成，
+    **不含用户身份**。仅可用于无用户维度的纯派生数据（如模板解析结果）；
+    用户态数据请显式调用 cache.get/set 并在 key 中带上 user_id。
     """
     import inspect
 
-    def decorator(func):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         # 预先判断是否为实例方法（第一个参数名为 self 或 cls）
         try:
             sig = inspect.signature(func)
@@ -315,7 +322,7 @@ def cached(prefix: str, ttl: int | None = None):
         except (ValueError, TypeError):
             is_method = False
 
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             # 实例方法跳过 args[0]
             cache_args = args[1:] if is_method and args else args
             # S4: 用 _stable_repr 替代 str()，避免自定义对象内存地址导致 cache miss
@@ -333,7 +340,7 @@ def cached(prefix: str, ttl: int | None = None):
             await cache.set(cache_key, result, ttl)
             return result
 
-        wrapper.cache_clear = lambda: cache.clear(prefix)
+        wrapper.cache_clear = lambda: cache.clear(prefix)  # type: ignore[attr-defined] # 测试通过该动态属性清缓存
         return wrapper
 
     return decorator

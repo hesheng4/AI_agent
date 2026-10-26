@@ -1,9 +1,15 @@
 import hashlib
 import re
 from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+from jose import (  # type: ignore[import-untyped]  # python-jose 无类型 stubs
+    JWTError,
+    jwt,
+)
+from passlib.context import (  # type: ignore[import-untyped]  # passlib 无类型 stubs
+    CryptContext,
+)
 
 from app.config import get_settings
 
@@ -24,13 +30,17 @@ def _prehash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
-        return pwd_context.verify(_prehash_password(plain_password), hashed_password)
+        # passlib 无 stubs，verify 实际返回 bool
+        return cast(
+            "bool",
+            pwd_context.verify(_prehash_password(plain_password), hashed_password),
+        )
     except (ValueError, TypeError):
         return False
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(_prehash_password(password))
+    return cast("str", pwd_context.hash(_prehash_password(password)))
 
 
 # S3/M4 — 密码复杂度策略
@@ -60,7 +70,9 @@ def validate_password_complexity(password: str) -> None:
         )
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+def create_access_token(
+    data: dict[str, Any], expires_delta: timedelta | None = None
+) -> str:
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
@@ -69,13 +81,15 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
     to_encode.update({"exp": expire, "type": "access"})
-    encoded_jwt = jwt.encode(
+    encoded_jwt: str = jwt.encode(
         to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
     )
     return encoded_jwt
 
 
-def create_refresh_token(data: dict, expires_delta: timedelta | None = None) -> str:
+def create_refresh_token(
+    data: dict[str, Any], expires_delta: timedelta | None = None
+) -> str:
     """生成长效 refresh token（S1/M2）。
 
     与 access token 共用 SECRET_KEY，但通过 `type=refresh` 声明区分，
@@ -87,16 +101,19 @@ def create_refresh_token(data: dict, expires_delta: timedelta | None = None) -> 
     else:
         expire = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    # jose 无 stubs，encode 实际返回 str
+    return cast(
+        "str", jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    )
 
 
-def decode_access_token(token: str) -> dict | None:
+def decode_access_token(token: str) -> dict[str, Any] | None:
     """解码并校验 access token；返回 payload 或 None（非法/过期）。
 
     严格校验 `type=access` 声明，拒绝 refresh token 被用作 access。
     """
     try:
-        payload = jwt.decode(
+        payload: dict[str, Any] = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         if payload.get("type") != "access":
@@ -106,13 +123,13 @@ def decode_access_token(token: str) -> dict | None:
         return None
 
 
-def decode_refresh_token(token: str) -> dict | None:
+def decode_refresh_token(token: str) -> dict[str, Any] | None:
     """解码并校验 refresh token；返回 payload 或 None。
 
     严格校验 `type=refresh` 声明，拒绝 access token 被用作 refresh。
     """
     try:
-        payload = jwt.decode(
+        payload: dict[str, Any] = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         if payload.get("type") != "refresh":

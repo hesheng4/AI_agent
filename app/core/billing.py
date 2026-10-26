@@ -40,7 +40,7 @@ PLANS = {
 
 
 class BillingService:
-    def __init__(self, db):
+    def __init__(self, db: Any) -> None:
         self.db = db
 
     async def check_quota(self, user_id: str) -> dict[str, Any]:
@@ -67,7 +67,9 @@ class BillingService:
 
         return {"allowed": True, "plan": plan["name"]}
 
-    async def record_usage(self, user_id: str, api_calls: int = 1, tokens: int = 0):
+    async def record_usage(
+        self, user_id: str, api_calls: int = 1, tokens: int = 0
+    ) -> None:
         """记录使用量"""
         import uuid
 

@@ -47,9 +47,9 @@ async def close_http_client() -> None:
 _ATOM_NS = "{http://www.w3.org/2005/Atom}"
 
 
-def _parse_arxiv_response(content: str, limit: int) -> list[dict]:
+def _parse_arxiv_response(content: str, limit: int) -> list[dict[str, Any]]:
     """用 ElementTree 解析 arXiv Atom XML，比正则更稳健"""
-    papers: list[dict] = []
+    papers: list[dict[str, Any]] = []
     try:
         root = ET.fromstring(content)
     except ET.ParseError as e:
@@ -99,8 +99,8 @@ class LiteratureTools:
 
     @staticmethod
     async def search_papers(
-        query: str, filters: dict[str, Any] = None, limit: int = 10
-    ) -> list[dict]:
+        query: str, filters: dict[str, Any] | None = None, limit: int = 10
+    ) -> list[dict[str, Any]]:
         """搜索文献 - 使用Semantic Scholar API"""
         logger.info(f"搜索文献: {query}, limit={limit}")
 
@@ -119,10 +119,10 @@ class LiteratureTools:
             raise ToolException(f"文献搜索失败: {str(e)}", tool_name="search_papers")
 
     @staticmethod
-    async def _search_semantic_scholar(query: str, limit: int) -> list[dict]:
+    async def _search_semantic_scholar(query: str, limit: int) -> list[dict[str, Any]]:
         """Semantic Scholar搜索"""
         url = f"{SEMANTIC_SCHOLAR_API}/paper/search"
-        params = {
+        params: dict[str, Any] = {
             "query": query,
             "limit": limit,
             "fields": "title,authors,abstract,year,journal,citationCount,url",
@@ -170,9 +170,9 @@ class LiteratureTools:
             return []
 
     @staticmethod
-    async def _search_arxiv(query: str, limit: int) -> list[dict]:
+    async def _search_arxiv(query: str, limit: int) -> list[dict[str, Any]]:
         """arXiv搜索"""
-        params = {
+        params: dict[str, Any] = {
             "search_query": f"all:{query}",
             "start": 0,
             "max_results": limit,
@@ -247,7 +247,7 @@ class LiteratureTools:
         return paper_content
 
     @staticmethod
-    def format_citation(paper: dict, style: str = "apa") -> str:
+    def format_citation(paper: dict[str, Any], style: str = "apa") -> str:
         """格式化引用"""
         authors = paper.get("authors", [])
         year = paper.get("year", "n.d.")
@@ -276,7 +276,7 @@ class LiteratureTools:
             return f"{title} by {', '.join(authors)} ({year})"
 
     @staticmethod
-    def format_citations(papers: list[dict], style: str = "apa") -> str:
+    def format_citations(papers: list[dict[str, Any]], style: str = "apa") -> str:
         """批量格式化引用"""
         citations = []
         for i, paper in enumerate(papers, 1):
@@ -330,7 +330,7 @@ class LiteratureTools:
         top_k: int = 10,
         year_from: int | None = None,
         year_to: int | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """语义搜索"""
         logger.info(f"语义搜索: {query}")
 
@@ -367,7 +367,7 @@ class LiteratureTools:
             raise ToolException(f"语义搜索失败: {str(e)}", tool_name="semantic_search")
 
     @staticmethod
-    async def index_papers_batch(papers: list[dict]) -> list[str]:
+    async def index_papers_batch(papers: list[dict[str, Any]]) -> list[str]:
         """批量索引文献"""
         logger.info(f"批量索引 {len(papers)} 篇文献")
 
@@ -415,7 +415,7 @@ class LiteratureTools:
     # ========== 文献库管理工具 ==========
 
     @staticmethod
-    def deduplicate_papers(papers: list[dict]) -> list[dict]:
+    def deduplicate_papers(papers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """检测重复文献"""
         from difflib import SequenceMatcher
 
@@ -471,7 +471,7 @@ class LiteratureTools:
 
     @staticmethod
     def analyze_citation_network(
-        papers: list[dict], citations: list[dict]
+        papers: list[dict[str, Any]], citations: list[dict[str, Any]]
     ) -> dict[str, Any]:
         """分析引用网络"""
         from app.services.citation_network import CitationNetwork
@@ -509,7 +509,8 @@ class LiteratureTools:
 
     @staticmethod
     def trace_research_lineage(
-        papers: list[dict], citations: list[dict], paper_id: str, max_depth: int = 5
+         papers: list[dict[str, Any]], citations: list[dict[str, Any]],
+        paper_id: str, max_depth: int = 5
     ) -> dict[str, Any]:
         """追溯研究脉络"""
         from app.services.citation_network import CitationNetwork
@@ -537,8 +538,8 @@ class LiteratureTools:
 
     @staticmethod
     def identify_frontier(
-        papers: list[dict],
-        citations: list[dict],
+        papers: list[dict[str, Any]],
+        citations: list[dict[str, Any]],
         year_from: int = 2020,
         top_k: int = 20,
     ) -> dict[str, Any]:
@@ -568,7 +569,8 @@ class LiteratureTools:
 
     @staticmethod
     def detect_clusters(
-        papers: list[dict], citations: list[dict], algorithm: str = "louvain"
+         papers: list[dict[str, Any]], citations: list[dict[str, Any]],
+        algorithm: str = "louvain"
     ) -> dict[str, Any]:
         """检测研究聚类"""
         from app.services.citation_network import CitationNetwork
@@ -598,7 +600,7 @@ class LiteratureTools:
 
     @staticmethod
     def _tool_citation_graph(
-        papers: list[dict], paper_id: str, depth: int = 2
+        papers: list[dict[str, Any]], paper_id: str, depth: int = 2
     ) -> dict[str, Any]:
         """构建指定论文的引用关系图（BFS展开，含图表配置）"""
         from app.services.citation_network import CitationNetwork
@@ -609,7 +611,7 @@ class LiteratureTools:
 
     @staticmethod
     def _tool_co_citation(
-        papers: list[dict], min_co_citations: int = 1, top_k: int = 50
+        papers: list[dict[str, Any]], min_co_citations: int = 1, top_k: int = 50
     ) -> dict[str, Any]:
         """共被引分析：发现经常被一起引用的论文对"""
         from app.services.citation_network import CitationNetwork
@@ -620,7 +622,7 @@ class LiteratureTools:
 
     @staticmethod
     def _tool_bibliographic_coupling(
-        papers: list[dict], min_coupling: int = 1, top_k: int = 50
+        papers: list[dict[str, Any]], min_coupling: int = 1, top_k: int = 50
     ) -> dict[str, Any]:
         """文献耦合分析：发现引用相同参考文献的论文对"""
         from app.services.citation_network import CitationNetwork
@@ -631,7 +633,8 @@ class LiteratureTools:
 
     @staticmethod
     def _tool_research_clusters(
-        papers: list[dict], algorithm: str = "louvain", min_cluster_size: int = 3
+         papers: list[dict[str, Any]], algorithm: str = "louvain",
+        min_cluster_size: int = 3
     ) -> dict[str, Any]:
         """研究聚类/社区检测"""
         from app.services.citation_network import CitationNetwork
@@ -642,7 +645,7 @@ class LiteratureTools:
 
     @staticmethod
     def _tool_research_frontier(
-        papers: list[dict], year_from: int = 2020, top_k: int = 20
+        papers: list[dict[str, Any]], year_from: int = 2020, top_k: int = 20
     ) -> dict[str, Any]:
         """研究前沿识别：近年高影响力论文与新兴主题"""
         from app.services.citation_network import CitationNetwork
@@ -653,7 +656,7 @@ class LiteratureTools:
 
     @staticmethod
     def _tool_research_lineage(
-        papers: list[dict], paper_id: str, max_depth: int = 5
+        papers: list[dict[str, Any]], paper_id: str, max_depth: int = 5
     ) -> dict[str, Any]:
         """研究脉络追溯：从一篇论文回溯到学术根源"""
         from app.services.citation_network import CitationNetwork
@@ -664,7 +667,7 @@ class LiteratureTools:
 
     @staticmethod
     def _tool_knowledge_diffusion(
-        papers: list[dict], paper_id: str, max_depth: int = 3
+        papers: list[dict[str, Any]], paper_id: str, max_depth: int = 3
     ) -> dict[str, Any]:
         """知识扩散分析：追踪论文影响力的传播路径"""
         from app.services.citation_network import CitationNetwork
@@ -674,7 +677,9 @@ class LiteratureTools:
         return network.knowledge_diffusion(paper_id, max_depth)
 
     @staticmethod
-    def _tool_citation_timeline(papers: list[dict], paper_id: str) -> dict[str, Any]:
+    def _tool_citation_timeline(
+        papers: list[dict[str, Any]], paper_id: str
+    ) -> dict[str, Any]:
         """引用时间线：按年份统计被引趋势"""
         from app.services.citation_network import CitationNetwork
 
@@ -683,7 +688,9 @@ class LiteratureTools:
         return network.citation_timeline(paper_id)
 
     @staticmethod
-    def _tool_influential_papers(papers: list[dict], top_k: int = 10) -> dict[str, Any]:
+    def _tool_influential_papers(
+        papers: list[dict[str, Any]], top_k: int = 10
+    ) -> dict[str, Any]:
         """高影响力论文识别（基于PageRank）"""
         from app.services.citation_network import CitationNetwork
 
@@ -693,7 +700,7 @@ class LiteratureTools:
         return {"influential_papers": influential, "n_papers": len(influential)}
 
     @staticmethod
-    def _tool_network_metrics(papers: list[dict]) -> dict[str, Any]:
+    def _tool_network_metrics(papers: list[dict[str, Any]]) -> dict[str, Any]:
         """引用网络整体指标"""
         from app.services.citation_network import CitationNetwork
 

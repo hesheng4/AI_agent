@@ -17,7 +17,7 @@ _SUMMARIZE_CONCURRENCY = 5
 
 
 class LiteratureAgent(BaseAgent):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="literature",
             tools=[
@@ -121,7 +121,7 @@ class LiteratureAgent(BaseAgent):
             # 并发总结单篇文献，Semaphore 限制并发度
             sem = asyncio.Semaphore(_SUMMARIZE_CONCURRENCY)
 
-            async def summarize_one(paper: dict[str, Any]) -> dict[str, str]:
+            async def summarize_one(paper: dict[str, Any]) -> dict[str, Any]:
                 prompt = (
                     f"请总结以下文献的核心内容：\n"
                     f"标题：{paper.get('title')}\n摘要：{paper.get('abstract')}"
@@ -536,7 +536,7 @@ class LiteratureAgent(BaseAgent):
     }
 
     @staticmethod
-    def detect_workflow(request: dict) -> str:
+    def detect_workflow(request: dict[str, Any]) -> str:
         """检测学术搜索工作流类型"""
         task = request.get("task", "search")
         if "verify" in task or "核对" in task:

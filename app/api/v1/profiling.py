@@ -98,7 +98,7 @@ _current_profiling: dict[str, Any] | None = None
 
 
 @router.get("/status")
-async def get_profiling_status():
+async def get_profiling_status() -> dict[str, Any]:
     """查看 Profiling 模块状态"""
     # 检查 torch_npu 是否可用
     npu_available = False
@@ -135,7 +135,7 @@ async def get_profiling_status():
 
 
 @router.get("/levels")
-async def get_profiling_levels():
+async def get_profiling_levels() -> dict[str, Any]:
     """查看采集级别说明"""
     return {
         "levels": [
@@ -168,7 +168,7 @@ async def get_profiling_levels():
 
 
 @router.post("/generate")
-async def generate_profiling(req: ProfilingGenerateRequest):
+async def generate_profiling(req: ProfilingGenerateRequest) -> dict[str, Any]:
     """生成 Profiling 采集脚本"""
     try:
         level = ProfilingLevel(req.level)
@@ -207,7 +207,7 @@ async def generate_profiling(req: ProfilingGenerateRequest):
 
 
 @router.post("/run")
-async def run_profiling(req: ProfilingRunRequest):
+async def run_profiling(req: ProfilingRunRequest) -> dict[str, Any]:
     """触发 Profiling 采集（实际执行）
 
     在后台子进程中启动采集任务，立即返回任务句柄。
@@ -233,19 +233,21 @@ async def run_profiling(req: ProfilingRunRequest):
 
 
 @router.get("/task-status")
-async def get_task_status():
+async def get_task_status() -> dict[str, Any]:
     """查询当前采集任务状态"""
     return query_profiling_status()
 
 
 @router.post("/stop")
-async def stop_current_task():
+async def stop_current_task() -> dict[str, Any]:
     """终止当前采集任务"""
     return stop_profiling()
 
 
 @router.get("/results")
-async def get_profiling_results(output_dir: str = "./profiling_output"):
+async def get_profiling_results(
+    output_dir: str = "./profiling_output"
+) -> dict[str, Any]:
     """查看采集结果（扫描文件系统）"""
     results = scan_profiling_results(output_dir)
     return {
@@ -256,7 +258,7 @@ async def get_profiling_results(output_dir: str = "./profiling_output"):
 
 
 @router.get("/checklist")
-async def get_analysis_checklist():
+async def get_analysis_checklist() -> dict[str, Any]:
     """获取分析检查清单"""
     return {
         "template_path": "docs/references/analysis-checklist.md",
@@ -291,10 +293,10 @@ async def get_analysis_checklist():
 
 
 @router.get("/env-check")
-async def check_profiling_env():
+async def check_profiling_env() -> dict[str, Any]:
     """环境预检"""
 
-    checks = {
+    checks: dict[str, dict[str, Any]] = {
         "torch_npu": {"available": False, "detail": None},
         "profiler": {"available": False, "detail": None},
         "npu_device": {"available": False, "detail": None},
@@ -357,7 +359,7 @@ async def check_profiling_env():
 
 
 @router.post("/generate-gpu-comparison")
-async def generate_gpu_comparison(req: GPUComparisonRequest):
+async def generate_gpu_comparison(req: GPUComparisonRequest) -> dict[str, Any]:
     """生成 GPU 对比采集脚本
 
     GPU 采集使用原生 torch.profiler，与 NPU 的区别：
@@ -390,7 +392,7 @@ async def generate_lightning_callback_api(
     output_dir: str = "./npu-profiling",
     level: str = "L0",
     skip_first: int = 20,
-):
+) -> dict[str, Any]:
     """生成 PyTorch Lightning Profiling Callback"""
     if level not in ("L0", "L1", "L2"):
         raise HTTPException(status_code=400, detail=f"无效的采集级别: {level}")
@@ -412,7 +414,7 @@ async def generate_lightning_callback_api(
 async def generate_hf_callback_api(
     output_dir: str = "./npu-profiling",
     skip_first: int = 20,
-):
+) -> dict[str, Any]:
     """生成 HuggingFace Transformers Trainer Profiling Callback"""
     code = generate_hf_trainer_callback(
         output_dir=output_dir,
@@ -426,7 +428,7 @@ async def generate_hf_callback_api(
 
 
 @router.post("/generate-deepspeed")
-async def generate_deepspeed_script_api(req: DeepSpeedScriptRequest):
+async def generate_deepspeed_script_api(req: DeepSpeedScriptRequest) -> dict[str, Any]:
     """生成 DeepSpeed 多卡 Profiling 采集脚本
 
     遵循 skill 4.3 节规范：

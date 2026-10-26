@@ -19,7 +19,7 @@ class SubPkgRequest(BaseModel):
     )
     abstract: str = Field(default="")
     journal: str = Field(default="nature")
-    artefacts: dict = Field(default_factory=dict)
+    artefacts: dict[str, Any] = Field(default_factory=dict)
 
 
 class SubPkgResponse(BaseModel):
@@ -27,7 +27,9 @@ class SubPkgResponse(BaseModel):
 
 
 @router.post("/", response_model=SubPkgResponse)
-async def subpkg_endpoint(req: SubPkgRequest, user: User = Depends(get_current_user)):
+async def subpkg_endpoint(
+    req: SubPkgRequest, user: User = Depends(get_current_user)
+) -> SubPkgResponse:
     result = await _agent.process(
         {
             **req.model_dump(),

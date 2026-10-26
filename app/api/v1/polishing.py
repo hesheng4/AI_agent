@@ -29,7 +29,7 @@ class PolishingResponse(BaseModel):
 @router.post("/", response_model=PolishingResponse)
 async def polishing_endpoint(
     req: PolishingRequest, user: User = Depends(get_current_user)
-):
+) -> PolishingResponse:
     result = await _agent.process(
         {
             **req.model_dump(),

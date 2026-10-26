@@ -22,7 +22,7 @@ class ReviewerAgent(BaseAgent):
     - quick-check: 快速预审检查
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(name="reviewer", tools=["assess", "score", "quick-check"])
 
     async def process(self, request: dict[str, Any]) -> dict[str, Any]:
@@ -146,7 +146,7 @@ class ReviewerAgent(BaseAgent):
     @staticmethod
     def _parse_score(raw: str) -> dict[str, Any]:
         """容错解析评分 JSON（剥离代码块围栏/前后杂文）"""
-        empty = {"overall": None, "axes": {}}
+        empty: dict[str, Any] = {"overall": None, "axes": {}}
         if not raw or not raw.strip():
             return empty
         text = raw.strip()
@@ -244,7 +244,7 @@ class ReviewerAgent(BaseAgent):
     }
 
     @staticmethod
-    def qa_check(review_result: dict) -> dict:
+    def qa_check(review_result: dict[str, Any]) -> dict[str, Any]:
         """QA 检查：groundedness/coverage/role/non-invention"""
         issues = []
         if "cross_review" not in review_result:

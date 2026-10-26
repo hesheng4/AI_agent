@@ -22,7 +22,7 @@ class DataAvailabilityAgent(BaseAgent):
     # 数据可用性声明属半确定性任务，低温保证输出可复现
     _DETERMINISTIC_TEMPERATURE = 0.0
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="data_agent",
             tools=["generate-statement", "audit-statement", "select-repository"],

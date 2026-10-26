@@ -11,7 +11,7 @@ from app.utils.exceptions import AgentException
 
 
 class SubmissionPackageAgent(BaseAgent):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="submission_package",
             tools=["match_journal", "checklist", "consistency_check"],
@@ -29,7 +29,7 @@ class SubmissionPackageAgent(BaseAgent):
             return await handler(request)
         raise AgentException(f"未知任务类型: {task}", self.name)
 
-    async def match_journal(self, request):
+    async def match_journal(self, request: dict[str, Any]) -> dict[str, Any]:
         abstract = request.get("abstract", "")
         prompt = (
             "根据摘要推荐 Nature Portfolio 候选期刊"
@@ -46,7 +46,7 @@ class SubmissionPackageAgent(BaseAgent):
         )
         return {"journal_matches": result}
 
-    async def checklist(self, request):
+    async def checklist(self, request: dict[str, Any]) -> dict[str, Any]:
         journal = request.get("journal", "nature")
         artefacts = request.get("artefacts", {})
         prompt = (
@@ -63,7 +63,7 @@ class SubmissionPackageAgent(BaseAgent):
         )
         return {"checklist": result}
 
-    async def consistency_check(self, request):
+    async def consistency_check(self, request: dict[str, Any]) -> dict[str, Any]:
         artefacts = request.get("artefacts", {})
         prompt = (
             "跨件一致性检查（C1期刊名/C2图数量/C3作者/C4统计方法/"

@@ -11,7 +11,7 @@ class WritingTools:
     """Nature-skills 驱动的学术写作工具集"""
 
     # 论文类型分类（源自 paper-type-taxonomy.md）
-    PAPER_TYPES = {
+    PAPER_TYPES: dict[str, dict[str, Any]] = {
         "research": {
             "label": "研究论文",
             "definition": "报告通过观察或实验发现的现象、机制或结果",
@@ -441,7 +441,7 @@ class WritingTools:
             ],
         }
 
-        scores = {}
+        scores: dict[str, Any] = {}
         for ptype, patterns in signals.items():
             score = 0
             for pattern in patterns:
@@ -466,7 +466,7 @@ class WritingTools:
         """检查语法和写作问题"""
         logger.info(f"检查语法，文本长度: {len(text)}")
 
-        issues = []
+        issues: list[dict[str, Any]] = []
 
         # 检查常见问题
         for pattern, message in WritingTools.COMMON_ISSUES.items():
@@ -521,7 +521,7 @@ class WritingTools:
 
         # 检查重复词
         words = re.findall(r"\b\w+\b", text.lower())
-        word_freq = {}
+        word_freq: dict[str, int] = {}
         for word in words:
             if len(word) > 4:
                 word_freq[word] = word_freq.get(word, 0) + 1
@@ -562,7 +562,9 @@ class WritingTools:
         return issues
 
     @staticmethod
-    def analyze_structure(content: str, paper_type: str = None) -> dict[str, Any]:
+    def analyze_structure(
+        content: str, paper_type: str | None = None
+    ) -> dict[str, Any]:
         """分析论文的论证结构（Nature-skills 读者工作流驱动）"""
         logger.info(f"分析论证结构，文本长度: {len(content)}")
 
@@ -639,13 +641,13 @@ class WritingTools:
     @staticmethod
     def _extract_sections(content: str) -> list[dict[str, str]]:
         """从文本中提取章节"""
-        sections = []
+        sections: list[dict[str, Any]] = []
         # 匹配 Markdown 标题
         pattern = r"^(#{1,3})\s+(.+)$"
         lines = content.split("\n")
 
         current_section = None
-        current_content = []
+        current_content: list[str] = []
 
         for line in lines:
             match = re.match(pattern, line)
@@ -668,7 +670,9 @@ class WritingTools:
         return sections
 
     @staticmethod
-    def _analyze_reader_questions(content: str, sections: list[dict]) -> dict[str, Any]:
+    def _analyze_reader_questions(
+        content: str, sections: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """分析5个读者问题的覆盖情况"""
         content_lower = content.lower()
         {s["title"].lower(): s.get("content", "") for s in sections}
@@ -721,7 +725,7 @@ class WritingTools:
             "未来",
         ]
 
-        result = {
+        result: dict[str, Any] = {
             "relevance_covered": any(kw in content_lower for kw in relevance_keywords),
             "novelty_covered": any(kw in content_lower for kw in novelty_keywords),
             "trust_covered": any(kw in content_lower for kw in trust_keywords),
@@ -923,7 +927,9 @@ class WritingTools:
         }
 
     @staticmethod
-    def generate_references_section(papers: list[dict], style: str = "apa") -> str:
+    def generate_references_section(
+        papers: list[dict[str, Any]], style: str = "apa"
+    ) -> str:
         """生成参考文献列表"""
         from app.agents.literature.tools import LiteratureTools
 
@@ -963,7 +969,7 @@ class WritingTools:
         """构建术语账本（Nature-skills 核心概念）"""
         logger.info(f"构建术语账本，文本长度: {len(content)}")
 
-        ledger = {}
+        ledger: dict[str, Any] = {}
 
         # 提取缩写定义模式
         # 英文: "full term (ABBREVIATION)" or "full term (ABBR.)"
@@ -998,7 +1004,7 @@ class WritingTools:
 
         # 提取反复出现的专业术语（出现3次以上的长词）
         words = re.findall(r"\b[A-Z][a-z]{4,}(?:\s+[A-Z][a-z]{3,})*\b", content)
-        word_freq = {}
+        word_freq: dict[str, int] = {}
         for word in words:
             word_freq[word] = word_freq.get(word, 0) + 1
 
@@ -1030,7 +1036,7 @@ class WritingTools:
     _last_citation_order: list[str] = []
 
     @staticmethod
-    def insert_citations(text: str, citations: list[dict]) -> str:
+    def insert_citations(text: str, citations: list[dict[str, Any]]) -> str:
         """将文本中的引用占位符替换为编号标记 [1]/[2]...
 
         支持占位符：[CITE:key] 与 {{key}}。按首次出现顺序编号，
@@ -1066,7 +1072,9 @@ class WritingTools:
         return pattern.sub(_replace, text)
 
     @staticmethod
-    def build_reference_list(citations: list[dict], style: str = "apa") -> str:
+    def build_reference_list(
+        citations: list[dict[str, Any]], style: str = "apa"
+    ) -> str:
         """按引用顺序生成参考文献列表
 
         Args:
@@ -1094,7 +1102,7 @@ class WritingTools:
             c.get("key", ""): c for c in citations if isinstance(c, dict)
         }
 
-        ordered: list[dict] = []
+        ordered: list[dict[str, Any]] = []
         seen = set()
         for k in order:
             if k in key_to_citation and k not in seen:
@@ -1112,7 +1120,7 @@ class WritingTools:
         return "\n".join(lines)
 
     @staticmethod
-    def _format_citation(citation: dict, style: str, index: int) -> str:
+    def _format_citation(citation: dict[str, Any], style: str, index: int) -> str:
         """格式化单条引用（内部辅助）"""
         authors = citation.get("authors", []) or []
         year = citation.get("year", "")
@@ -1156,7 +1164,7 @@ class WritingTools:
         return f"[{index}] " + " ".join(parts)
 
     @staticmethod
-    def export_manuscript(manuscript: dict, format: str) -> str:
+    def export_manuscript(manuscript: dict[str, Any], format: str) -> str:
         """导出手稿为指定格式
 
         Args:
@@ -1222,7 +1230,7 @@ class WritingTools:
         return skeleton
 
     @staticmethod
-    def export_papers(papers: list[dict], format: str) -> str:
+    def export_papers(papers: list[dict[str, Any]], format: str) -> str:
         """导出文献列表为指定格式
 
         Args:

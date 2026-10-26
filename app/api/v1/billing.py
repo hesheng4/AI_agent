@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -25,13 +27,13 @@ class UsageResponse(BaseModel):
 
 
 class PlansResponse(BaseModel):
-    plans: dict
+    plans: dict[str, Any]
 
 
 @router.get("/check-quota", response_model=QuotaCheckResponse)
 async def check_quota(
     current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
-):
+) -> QuotaCheckResponse:
     billing_service = BillingService(db)
     result = await billing_service.check_quota(current_user.id)
     return QuotaCheckResponse(**result)
@@ -40,7 +42,7 @@ async def check_quota(
 @router.get("/usage", response_model=UsageResponse)
 async def get_usage(
     current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
-):
+) -> UsageResponse:
     result = await db.execute(
         select(UserAccount).where(UserAccount.user_id == current_user.id)
     )
@@ -57,7 +59,7 @@ async def get_usage(
 
 
 @router.get("/plans", response_model=PlansResponse)
-async def get_plans():
+async def get_plans() -> PlansResponse:
     plans = {
         plan_type.value: {
             "name": plan_info["name"],

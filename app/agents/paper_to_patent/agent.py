@@ -23,7 +23,7 @@ SUPPORT_STATES = ["explicit", "inherent", "needs-confirmation", "unsupported"]
 class PaperToPatentAgent(BaseAgent):
     """论文→中国发明专利 Agent"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="paper_to_patent",
             tools=[
@@ -76,7 +76,7 @@ class PaperToPatentAgent(BaseAgent):
 
     def _build_source_map(self, content: str) -> list[dict[str, Any]]:
         """Stage 1: 创建源依据映射 (P001/E001/F001/C001)"""
-        source_ids = []
+        source_ids: list[dict[str, Any]] = []
         # 按段落分配 P001...
         paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
         for i, para in enumerate(paragraphs):
@@ -150,9 +150,9 @@ class PaperToPatentAgent(BaseAgent):
     async def _draft_full(
         self,
         content: str,
-        source_map: list,
-        terminology: dict,
-        evidence: list,
+        source_map: list[dict[str, Any]],
+        terminology: dict[str, Any],
+        evidence: list[dict[str, Any]],
         invention_type: str,
     ) -> dict[str, Any]:
         """Stage 5-7: 完整草稿"""
@@ -184,8 +184,8 @@ class PaperToPatentAgent(BaseAgent):
     async def _draft_claims(
         self,
         content: str,
-        terminology: dict,
-        evidence: list,
+        terminology: dict[str, Any],
+        evidence: list[dict[str, Any]],
         invention_type: str,
     ) -> dict[str, Any]:
         """仅生成权利要求书"""
@@ -199,7 +199,7 @@ class PaperToPatentAgent(BaseAgent):
         claims = await self.call_llm(prompt, temperature=0.0)
         return {"claims": claims, "invention_type": invention_type}
 
-    def _audit_support(self, evidence: list) -> dict[str, Any]:
+    def _audit_support(self, evidence: list[dict[str, Any]]) -> dict[str, Any]:
         """审计支撑一致性"""
         unsupported = [e for e in evidence if e["support_state"] == "unsupported"]
         return {

@@ -8,18 +8,23 @@
 这样上层业务代码无需感知加密逻辑。
 """
 
+from typing import TYPE_CHECKING, Any
+
 from sqlalchemy import String, TypeDecorator
 from sqlalchemy.engine.interfaces import Dialect
 
 from app.utils.logger import get_logger
 
+if TYPE_CHECKING:
+    from cryptography.fernet import Fernet
+
 logger = get_logger("encrypted_type")
 
-_fernet_cache: object | None = None
+_fernet_cache: Fernet | None = None
 _fernet_inited: bool = False
 
 
-def _get_fernet():
+def _get_fernet() -> Fernet | None:
     """懒初始化 Fernet 客户端。无密钥时返回 None（明文模式）"""
     global _fernet_cache, _fernet_inited
     if _fernet_inited:
@@ -41,7 +46,7 @@ def _get_fernet():
     return _fernet_cache
 
 
-class EncryptedString(TypeDecorator):
+class EncryptedString(TypeDecorator[str]):
     """透明加解密的字符串类型
 
     数据库存储密文（含 "enc:" 前缀以区分明文），Python 层拿到明文。
@@ -51,11 +56,13 @@ class EncryptedString(TypeDecorator):
     impl = String
     cache_ok = True
 
-    def __init__(self, *args, length: int = 512, **kwargs):
+    def __init__(self, *args: Any, length: int = 512, **kwargs: Any) -> None:
         # 数据库列长度需容纳密文（明文长度 + ~100 字节 Fernet 开销）
         super().__init__(length=length, *args, **kwargs)
 
-    def process_bind_param(self, value, dialect: Dialect):
+    def process_bind_param(
+        self, value: str | None, dialect: Dialect
+    ) -> str | None:
         if value is None or value == "":
             return value
         # 已经是密文格式则不重复加密
@@ -71,7 +78,9 @@ class EncryptedString(TypeDecorator):
             logger.error(f"加密失败，事务已回滚: {e}")
             raise
 
-    def process_result_value(self, value, dialect: Dialect):
+    def process_result_value(
+        self, value: str | None, dialect: Dialect
+    ) -> str | None:
         if value is None or value == "":
             return value
         if not (isinstance(value, str) and value.startswith("enc:")):

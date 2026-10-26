@@ -5,6 +5,23 @@ from httpx import ASGITransport
 from app.main import app
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """每个用例前清空全局内存限流器。
+
+    e2e 套件每个用例各自注册登录，全量运行（约 40+ 次 login）会触及
+    IP 级登录限流（20/分钟），导致排在后面的用例 429 失败。
+    清空后套件顺序无关、可重复。
+    """
+    from app.core import rate_limit as rl
+
+    backend = getattr(rl.rate_limiter, "_backend", None) or rl.rate_limiter
+    requests_store = getattr(backend, "_requests", None)
+    if isinstance(requests_store, dict):
+        requests_store.clear()
+    yield
+
+
 @pytest.fixture
 async def client():
     """测试客户端（使用 ASGITransport，兼容新版 httpx）"""

@@ -1,9 +1,15 @@
+import asyncio
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from typing import Any
 
 from app.config import get_settings
-from app.utils.exceptions import AgentException, ToolException, ValidationException
+from app.utils.exceptions import (
+    AgentException,
+    LLMException,
+    ToolException,
+    ValidationException,
+)
 from app.utils.llm import LLMClient
 from app.utils.logger import get_logger
 
@@ -46,7 +52,7 @@ class BaseAgent(ABC):
         resolved_model = self._resolve_model(user_api_model)
         return resolved_key, resolved_url, resolved_model
 
-    def _get_tool_handler(self, tool_name: str):
+    def _get_tool_handler(self, tool_name: str) -> Any:
         """查找工具处理函数，支持自身方法或 tools_handler 委托"""
         # 检查自身 _tool_{name} 方法
         handler = getattr(self, f"_tool_{tool_name}", None)
@@ -97,6 +103,11 @@ class BaseAgent(ABC):
             )
             self.logger.debug(f"LLM返回 {len(result)} 字符")
             return result
+        except LLMException:
+            # LLM 超时/限流等异常原样穿透：workflow 恢复的 classify_failure
+            # 依赖具体类型/code 判定 transient（自动重试信号），
+            # 重包成 AgentException 会让失败分类永久失明。
+            raise
         except Exception as e:
             self.logger.error(f"LLM调用失败: {e}", exc_info=True)
             raise AgentException(f"LLM调用失败: {str(e)}", self.name) from e
@@ -141,12 +152,15 @@ class BaseAgent(ABC):
                 user_api_model=r_model,
             ):
                 yield chunk
+        except LLMException:
+            # 同 call_llm：保持类型与 code，供失败分类识别 transient
+            raise
         except Exception as e:
             self.logger.error(f"LLM流式调用失败: {e}", exc_info=True)
             raise AgentException(f"LLM流式调用失败: {str(e)}", self.name) from e
 
-    async def use_tool(self, tool_name: str, **kwargs) -> Any:
-        """使用工具，带验证"""
+    async def use_tool(self, tool_name: str, **kwargs: Any) -> Any:
+        """使用工具，带验证与墙钟超时"""
         if tool_name not in self.tools:
             raise ToolException(f"工具不可用: {tool_name}", tool_name=tool_name)
 
@@ -156,7 +170,15 @@ class BaseAgent(ABC):
 
         try:
             self.logger.debug(f"调用工具 {tool_name}，参数: {kwargs}")
-            result = await handler(**kwargs)
+            # 单工具墙钟超时：外部工具挂起时直连 agent 调用无步级超时兜底，
+            # 会无限阻塞；TimeoutError 由上层 classify_failure 归 transient。
+            tool_timeout = get_settings().AGENT_TOOL_TIMEOUT
+            if tool_timeout and tool_timeout > 0:
+                result = await asyncio.wait_for(
+                    handler(**kwargs), timeout=tool_timeout
+                )
+            else:
+                result = await handler(**kwargs)
             self.logger.debug(f"工具 {tool_name} 执行成功")
             return result
         except ToolException:

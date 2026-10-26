@@ -68,7 +68,7 @@ class SummarizeResponse(BaseModel):
 @router.post("/search", response_model=SearchResponse)
 async def search_literature(
     request: SearchRequest, current_user: User = Depends(get_current_user)
-):
+) -> SearchResponse:
     """文献搜索"""
     logger.info(f"用户 {current_user.id} 搜索文献: {request.query}")
 
@@ -83,7 +83,7 @@ async def search_literature(
 @router.post("/read", response_model=ReadResponse)
 async def read_literature(
     request: ReadRequest, current_user: User = Depends(get_current_user)
-):
+) -> ReadResponse:
     """文献阅读分析"""
     logger.info(f"用户 {current_user.id} 分析文献")
 
@@ -96,7 +96,7 @@ async def read_literature(
 @router.post("/summarize", response_model=SummarizeResponse)
 async def summarize_literature(
     request: SummarizeRequest, current_user: User = Depends(get_current_user)
-):
+) -> SummarizeResponse:
     """文献总结"""
     logger.info(f"用户 {current_user.id} 总结 {len(request.papers)} 篇文献")
 
@@ -139,7 +139,7 @@ async def get_citations(
     paper_id: str,
     limit: int = Query(default=50, le=200),
     current_user: User = Depends(get_current_user),
-):
+) -> dict[str, Any]:
     """获取引用该论文的文献"""
     logger.info(f"用户 {current_user.id} 获取引用: {paper_id}")
 
@@ -158,7 +158,7 @@ async def get_references(
     paper_id: str,
     limit: int = Query(default=50, le=200),
     current_user: User = Depends(get_current_user),
-):
+) -> dict[str, Any]:
     """获取该论文的参考文献"""
     logger.info(f"用户 {current_user.id} 获取参考文献: {paper_id}")
 
@@ -177,7 +177,7 @@ async def get_citation_network(
     paper_id: str,
     depth: int = Query(default=1, le=2),
     current_user: User = Depends(get_current_user),
-):
+) -> CitationNetworkResponse:
     """构建引用网络"""
     logger.info(f"用户 {current_user.id} 构建引用网络: {paper_id}")
 
@@ -190,7 +190,7 @@ async def get_citation_network(
 async def find_co_citations(
     paper_ids: list[str] = Body(..., embed=True),
     current_user: User = Depends(get_current_user),
-):
+) -> CoCitationResponse:
     """查找共被引关系"""
     logger.info(f"用户 {current_user.id} 查找共被引: {len(paper_ids)} 篇")
 
@@ -202,7 +202,7 @@ async def find_co_citations(
 @router.get("/citation-trend/{paper_id}", response_model=CitationTrendResponse)
 async def get_citation_trend(
     paper_id: str, current_user: User = Depends(get_current_user)
-):
+) -> CitationTrendResponse:
     """获取引用趋势"""
     logger.info(f"用户 {current_user.id} 获取引用趋势: {paper_id}")
 
@@ -288,7 +288,7 @@ class InfluentialPapersRequest(BaseModel):
 @router.post("/citation-graph")
 async def build_citation_graph(
     request: CitationGraphRequest, current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     """构建指定论文的引用关系图（BFS展开，含图表配置）"""
     logger.info(
         f"用户 {current_user.id} 构建引用图: {request.paper_id}, depth={request.depth}"
@@ -309,7 +309,7 @@ async def build_citation_graph(
 @router.post("/co-citation")
 async def co_citation_analysis(
     request: CoCitationAnalysisRequest, current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     """共被引分析：发现经常被一起引用的论文对"""
     logger.info(f"用户 {current_user.id} 共被引分析: {len(request.papers)} 篇")
 
@@ -329,7 +329,7 @@ async def co_citation_analysis(
 async def bibliographic_coupling(
     request: BibliographicCouplingRequest,
     current_user: User = Depends(get_current_user),
-):
+) -> dict[str, Any]:
     """文献耦合分析：发现引用相同参考文献的论文对"""
     logger.info(f"用户 {current_user.id} 文献耦合分析: {len(request.papers)} 篇")
 
@@ -348,7 +348,7 @@ async def bibliographic_coupling(
 @router.post("/research-clusters")
 async def research_clusters(
     request: ResearchClustersRequest, current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     """研究聚类/社区检测：发现研究主题分组"""
     logger.info(
         f"用户 {current_user.id} 研究聚类: {len(request.papers)} 篇, "
@@ -370,7 +370,7 @@ async def research_clusters(
 @router.post("/research-frontier")
 async def research_frontier(
     request: ResearchFrontierRequest, current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     """研究前沿识别：近年高影响力论文与新兴主题"""
     logger.info(f"用户 {current_user.id} 研究前沿: year_from={request.year_from}")
 
@@ -389,7 +389,7 @@ async def research_frontier(
 @router.post("/research-lineage")
 async def research_lineage(
     request: ResearchLineageRequest, current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     """研究脉络追溯：从一篇论文回溯到学术根源"""
     logger.info(f"用户 {current_user.id} 研究脉络: {request.paper_id}")
 
@@ -408,7 +408,7 @@ async def research_lineage(
 @router.post("/knowledge-diffusion")
 async def knowledge_diffusion(
     request: KnowledgeDiffusionRequest, current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     """知识扩散分析：追踪论文影响力的传播路径"""
     logger.info(f"用户 {current_user.id} 知识扩散: {request.paper_id}")
 
@@ -427,7 +427,7 @@ async def knowledge_diffusion(
 @router.post("/citation-timeline")
 async def citation_timeline(
     request: CitationTimelineRequest, current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     """引用时间线：按年份统计被引趋势"""
     logger.info(f"用户 {current_user.id} 引用时间线: {request.paper_id}")
 
@@ -445,7 +445,7 @@ async def citation_timeline(
 @router.post("/influential-papers")
 async def influential_papers(
     request: InfluentialPapersRequest, current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     """高影响力论文识别（基于PageRank）"""
     logger.info(f"用户 {current_user.id} 高影响力论文: top_k={request.top_k}")
 

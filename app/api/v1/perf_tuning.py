@@ -6,6 +6,8 @@
 - 配合 Profiling 使用：调优前后各采集一次 L0 Profiling
 """
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -153,7 +155,7 @@ def _request_to_config(req: TuningConfigRequest) -> TuningConfig:
 
 
 @router.get("/status")
-async def tuning_status():
+async def tuning_status() -> dict[str, Any]:
     """性能调优模块状态"""
     return {
         "module": "ascend_perf_tuning",
@@ -193,7 +195,7 @@ async def tuning_status():
 
 
 @router.get("/recommended-configs")
-async def recommended_configs():
+async def recommended_configs() -> dict[str, Any]:
     """获取不同场景的推荐调优配置"""
     configs = get_recommended_configs()
     return {
@@ -209,7 +211,7 @@ async def recommended_configs():
 
 
 @router.post("/apply")
-async def apply_tuning(req: TuningConfigRequest):
+async def apply_tuning(req: TuningConfigRequest) -> dict[str, Any]:
     """应用调优配置（渐进式执行）
 
     按"流水优化 → 绑核优化 → tcmalloc 替换 → 内存分配策略"顺序逐项执行。
@@ -233,7 +235,7 @@ async def apply_tuning(req: TuningConfigRequest):
 
 
 @router.post("/launch-command")
-async def launch_command(req: LaunchCommandRequest):
+async def launch_command(req: LaunchCommandRequest) -> dict[str, Any]:
     """生成带调优环境变量的启动命令"""
     config = _request_to_config(req.config)
     command = generate_launch_command(
@@ -248,7 +250,7 @@ async def launch_command(req: LaunchCommandRequest):
 
 
 @router.get("/detect-tcmalloc")
-async def check_tcmalloc():
+async def check_tcmalloc() -> dict[str, Any]:
     """检测 tcmalloc 是否已安装"""
     result = detect_tcmalloc()
     if not result["installed"]:
@@ -257,14 +259,14 @@ async def check_tcmalloc():
 
 
 @router.get("/detect-numa")
-async def check_numa():
+async def check_numa() -> dict[str, Any]:
     """检测 NUMA 拓扑（用于 CPU 绑核配置参考）"""
     result = detect_numa_topology()
     return result
 
 
 @router.get("/quick-reference")
-async def quick_reference():
+async def quick_reference() -> dict[str, Any]:
     """调优快速参考"""
     return {
         "optimizations": [
@@ -335,7 +337,7 @@ async def quick_reference():
 
 
 @router.post("/generate-compile-script/python")
-async def generate_python_compile(req: CompileScriptRequest):
+async def generate_python_compile(req: CompileScriptRequest) -> dict[str, Any]:
     """生成 Python 编译优化脚本（进阶）
 
     需要毕昇编译器环境。使用 LTO + PGO 从源码重编 Python。
@@ -362,7 +364,7 @@ async def generate_python_compile(req: CompileScriptRequest):
 
 
 @router.post("/generate-compile-script/pytorch")
-async def generate_pytorch_compile(req: CompileScriptRequest):
+async def generate_pytorch_compile(req: CompileScriptRequest) -> dict[str, Any]:
     """生成 PyTorch 编译优化脚本（进阶）
 
     仅当项目基于 PyTorch 时使用。必须按 PyTorch → torch_npu 的顺序执行。
@@ -390,7 +392,7 @@ async def generate_pytorch_compile(req: CompileScriptRequest):
 
 
 @router.post("/generate-compile-script/torch-npu")
-async def generate_torch_npu_compile(req: CompileScriptRequest):
+async def generate_torch_npu_compile(req: CompileScriptRequest) -> dict[str, Any]:
     """生成 torch_npu 编译优化脚本（进阶）
 
     必须先完成 PyTorch 编译优化并安装。
@@ -415,7 +417,7 @@ async def generate_torch_npu_compile(req: CompileScriptRequest):
 
 
 @router.get("/verify-env")
-async def verify_tuning_env():
+async def verify_tuning_env() -> dict[str, Any]:
     """验证当前调优环境变量设置"""
     env_checks = {
         "TASK_QUEUE_ENABLE": {
@@ -485,7 +487,7 @@ async def verify_tuning_env():
 
 
 @router.post("/analyze-script")
-async def analyze_script(req: ScriptAnalysisRequest):
+async def analyze_script(req: ScriptAnalysisRequest) -> dict[str, Any]:
     """分析 vLLM 启动脚本，匹配优化案例库
 
     遵循 optimizer-agent-plus Phase 2 规范：
@@ -501,7 +503,7 @@ async def analyze_script(req: ScriptAnalysisRequest):
 
 
 @router.post("/diagnose-bottleneck")
-async def diagnose_bottleneck_api(req: BottleneckDiagnosisRequest):
+async def diagnose_bottleneck_api(req: BottleneckDiagnosisRequest) -> dict[str, Any]:
     """基于 Profiling 结果判断瓶颈类型
 
     遵循 ascend-optimization skill 规范：
@@ -524,7 +526,9 @@ async def diagnose_bottleneck_api(req: BottleneckDiagnosisRequest):
 
 
 @router.post("/suggest-code-optimizations")
-async def suggest_code_optimizations_api(req: CodeOptimizationRequest):
+async def suggest_code_optimizations_api(
+    req: CodeOptimizationRequest
+) -> dict[str, Any]:
     """生成代码层优化建议（torch_npu 亲和算子替换）
 
     遵循 ascend-optimization skill 规范：

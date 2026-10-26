@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -86,7 +87,7 @@ class ProfilingConfig:
     cpu_affinity: int = 1
     task_queue_enable: int = 2
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.level == ProfilingLevel.L2:
             self.with_stack = True
             self.profile_memory = True
@@ -152,13 +153,16 @@ def setup_profiling_env(config: ProfilingConfig) -> dict[str, str]:
     return env_vars
 
 
-def build_profiler_kwargs(config: ProfilingConfig) -> dict[str, Any]:
+def build_profiler_kwargs(config: ProfilingConfig) -> tuple[dict[str, Any], str]:
     """构建 torch_npu.profiler.profile() 参数
 
     根据采集级别自动组装参数：
     - L0: 仅 NPU 活动
     - L1: CPU + NPU + record_shapes + ProfilerLevel.Level1
     - L2: L1 + with_stack + profile_memory
+
+    注意：实际返回 (kwargs, output_path) 二元组（原声明为 dict 与实现不符，
+    全仓库无调用方，此处按实际返回类型注解）。
     """
     try:
         import torch_npu.profiler
@@ -618,7 +622,7 @@ if local_rank == 0:
 
 # 全局任务状态（线程安全）
 _profiling_lock = threading.Lock()
-_current_process: subprocess.Popen | None = None
+_current_process: subprocess.Popen[str] | None = None
 
 
 def _build_run_command(
@@ -819,13 +823,22 @@ def stop_profiling() -> dict[str, Any]:
 
         proc = _current_process
         try:
-            import signal
+            if sys.platform == "win32":
+                # Windows 无进程组语义（getpgid/killpg/SIGKILL 均为
+                # POSIX-only）；terminate 会连同 msprof 子树一起结束
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+            else:
+                import signal
 
-            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
             _current_process = None
             return {"status": "terminated", "message": "任务已终止"}
         except ProcessLookupError:

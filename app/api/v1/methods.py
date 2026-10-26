@@ -27,7 +27,9 @@ class MethodsResponse(BaseModel):
 
 
 @router.post("/", response_model=MethodsResponse)
-async def methods_endpoint(req: MethodsRequest, user: User = Depends(get_current_user)):
+async def methods_endpoint(
+    req: MethodsRequest, user: User = Depends(get_current_user)
+) -> MethodsResponse:
     result = await _agent.process(
         {
             **req.model_dump(),

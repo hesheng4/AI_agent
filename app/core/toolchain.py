@@ -442,10 +442,12 @@ def get_vllm_install_guide() -> VLLMInstallGuide:
         "# 验证 torch_npu\n"
         'python -c "import torch_npu; print(torch_npu.__version__)"\n'
         "\n"
-        "# 验证 NPU 可见性\n"(
-            "python -c \"import torch; print(f'NPU 可用: "
-            "{torch.npu.is_available()}, 设备数: {torch.npu.device_count()}')\""
-        )
+        # 修复历史缺陷：原代码 "# 验证 NPU 可见性\n"("python -c ...") 把
+        # 字符串当函数调用，运行到本函数必抛 TypeError: 'str' object is
+        # not callable。本意为相邻字符串拼接（隐式续行）。
+        "# 验证 NPU 可见性\n"
+        'python -c "import torch; print(f\'NPU 可用: '
+        "{torch.npu.is_available()}, 设备数: {torch.npu.device_count()}')\"\n"
     )
 
     guide.common_issues = [
@@ -858,7 +860,7 @@ def generate_aisbench_script(config: AISBenchConfig) -> str:
 
 def verify_ascend_environment() -> dict[str, Any]:
     """验证完整的昇腾推理环境"""
-    checks = {
+    checks: dict[str, Any] = {
         "cann_toolkit": {"installed": False, "version": "", "path": ""},
         "npu_driver": {"installed": False, "version": ""},
         "torch_npu": {"installed": False, "version": ""},

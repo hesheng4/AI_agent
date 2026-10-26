@@ -77,7 +77,9 @@ class ReferenceManager:
         """批量添加参考文献"""
         return [self.add_reference(p) for p in papers]
 
-    def get_in_text_citation(self, paper: dict[str, Any], page: str = None) -> str:
+    def get_in_text_citation(
+        self, paper: dict[str, Any], page: str | None = None
+    ) -> str:
         """生成行内引用标记"""
         idx = self.add_reference(paper)
         CITATION_STYLES[self.style]
@@ -111,7 +113,7 @@ class ReferenceManager:
             插入引用后的文本
         """
 
-        def replace_citation(match):
+        def replace_citation(match: re.Match[str]) -> str:
             key = match.group(1)
             if key in citation_map:
                 return self.get_in_text_citation(citation_map[key])
@@ -242,7 +244,7 @@ class ReferenceManager:
     @staticmethod
     def _format_authors_short(paper: dict[str, Any]) -> str:
         """格式化短作者名（行内引用用）"""
-        authors = paper.get("authors", [])
+        authors: str | list[str] = paper.get("authors", [])
         if isinstance(authors, str):
             authors = [a.strip() for a in authors.split(",")]
 
@@ -257,7 +259,7 @@ class ReferenceManager:
             return f"{authors[0].split()[-1]} et al."
 
     @staticmethod
-    def _format_authors_full(authors: Any) -> str:
+    def _format_authors_full(authors: str | list[str]) -> str:
         """格式化完整作者名"""
         if isinstance(authors, str):
             return authors

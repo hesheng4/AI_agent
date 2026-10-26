@@ -181,3 +181,19 @@ README 现措辞（"4 处 TODO、未实现"）**低估了**该模块，需改。
 | R8 **基线在 Windows 生成、CI 跑 Ubuntu** | mypy 结果可能因平台差异（`sys.platform` 相关 stub、可选依赖可用性）导致 Ubuntu 上的错误数与 Windows 基线不一致，产生假回归。**首次 CI 运行即可验证**：若 typecheck job 红且报大量文件上涨，二选一——① 在 Ubuntu 上重新生成基线并提交；② 把 typecheck job 的 `runs-on` 改为 `windows-latest` 与开发环境对齐。**不许用 `--ignore-missing-imports` 之类开关把红压成绿。** |
 | R9 **CI 缺 `.env` 会直接启动失败** | `.env` 未被 git 跟踪（正确），但 `Settings.validate_security()` 在非 DEBUG 下强制要求 SECRET_KEY / CORS_ORIGINS / 有效 Fernet 密钥。CI 已显式设 `DEBUG=true`（与本地一致）。若将来需要跑生产模式路径的测试，需用 GitHub Secrets 注入真实密钥。 |
 | R7 **black 与 ruff 对中文行宽判定不一致** | black 按**字符数**（中文记 1），ruff E501 按**显示宽度**（中文记 2），同一行 black 认为 82 未超、ruff 认为 89 已超 → 两者会在 CI 内互相打架。当前仅 2 行触发，已手工缩短绕过。**治本方案待定**：改用 `ruff format` 统一宽度语义，或为 E501 单独放宽 `pycodestyle.max-line-length`。`app/agents/*/prompts.py` 已豁免 E501，但业务代码里的中文注释/desc 仍会持续触发。 |
+
+---
+
+## 6. 执行进度（2026-10-26 追记）
+
+> 详细数据与缺陷明细见 [reports/optimization-round2-report.md](../../reports/optimization-round2-report.md)。
+
+| 步骤 | 状态 |
+|---|---|
+| 4 批次一（按目录切片） | 全部完成：切片 1（agents 198→41）/ 2（api A 205→86）/ 3（api B 167→8）/ 4（core 159→21）/ 5（337→62）；**全量 890 → 58（-93.5%）** |
+| 5 批次二 triage | 12 项真缺陷修复（B1–B12）+ 7 项安全加固（S1–S6、S10），均带回归测试；另有 User 模型 Mapped[] 转换清偿 52+ 条 Column 连带错误 |
+| 6 agent_artifacts | ✅ 表+迁移 e8a4f2c6b9d1+服务+API+e2e；G7 全链路通过；orchestrate 支持 save_artifact opt-in；前端「结果存档」页 |
+| 7 share_links + fork | ✅ 表+服务+API+e2e；G8 黄金计数全等；前端「分享与 Fork」页 |
+| 8 前端 | 结果存档/分享两页 + coordinator save_artifact 开关 + refresh single-flight + isTokenExpired + PWA 不缓存 API + 残留文件清理；tsc 与 build 零报错 |
+
+门禁终态：G2 ruff=0 ✅ / G3 pytest **567 passed** 全绿（unit+integration+e2e 同进程）/ G4 基线 890 → 58 已重生成并通过 --check ✅ / G7 ✅ / G8 ✅ / G5 README 数字已同步实测 ✅。

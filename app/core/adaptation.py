@@ -156,7 +156,7 @@ class AdaptationSession:
     created_at: str = ""
     updated_at: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.created_at:
             self.created_at = datetime.now().isoformat()
         self.updated_at = self.created_at
@@ -189,7 +189,7 @@ _sessions: dict[str, AdaptationSession] = {}
 _sessions_lock = threading.Lock()
 
 
-def _update_session(session: AdaptationSession):
+def _update_session(session: AdaptationSession) -> None:
     """更新会话时间戳"""
     session.updated_at = datetime.now().isoformat()
 
@@ -508,7 +508,7 @@ def _infer_key_prefix(config: dict[str, Any]) -> str:
 
 def _scan_model_files(model_path: Path) -> dict[str, Any]:
     """扫描模型目录中的文件"""
-    result = {
+    result: dict[str, Any] = {
         "has_config": False,
         "has_tokenizer": False,
         "has_processor": False,
@@ -633,7 +633,7 @@ def _scan_operators(code: str) -> dict[str, list[str]]:
     Returns:
         包含 torch_ops, triton_ops, cuda_with_fallback, cuda_without_fallback 的字典
     """
-    result = {
+    result: dict[str, list[str]] = {
         "torch_ops": [],
         "triton_ops": [],
         "cuda_with_fallback": [],
@@ -783,7 +783,7 @@ def step4_framework_analysis(
 
 def _check_vllm_registry(vllm_path: str, architectures: list[str]) -> dict[str, Any]:
     """检查 vLLM registry.py 中是否已注册架构"""
-    result = {
+    result: dict[str, Any] = {
         "registered": False,
         "registered_architectures": [],
         "registry_path": "",
@@ -828,7 +828,7 @@ def _check_vllm_ascend_patches(
     vllm_path: str, architectures: list[str]
 ) -> dict[str, Any]:
     """检查 vllm-ascend 补丁"""
-    result = {
+    result: dict[str, Any] = {
         "patch_available": False,
         "patch_files": [],
     }
@@ -984,7 +984,7 @@ def step6_implement(
 
 
 def _generate_new_adapter_code(
-    session: AdaptationSession, details: dict
+    session: AdaptationSession, details: dict[str, Any]
 ) -> dict[str, Any]:
     """生成新适配器代码模板"""
     step2_data = session.steps_data[2].result
@@ -1088,7 +1088,9 @@ def load_weights_npu(model, checkpoint_path, device="npu"):
     }
 
 
-def _generate_reuse_code(session: AdaptationSession, details: dict) -> dict[str, Any]:
+def _generate_reuse_code(
+    session: AdaptationSession, details: dict[str, Any]
+) -> dict[str, Any]:
     """生成复用策略代码"""
     step2_data = session.steps_data[2].result
     architectures = step2_data.get("architectures", [])
@@ -1105,7 +1107,9 @@ def _generate_reuse_code(session: AdaptationSession, details: dict) -> dict[str,
     }
 
 
-def _generate_patch_code(session: AdaptationSession, details: dict) -> dict[str, Any]:
+def _generate_patch_code(
+    session: AdaptationSession, details: dict[str, Any]
+) -> dict[str, Any]:
     """生成补丁策略代码"""
     step2_data = session.steps_data[2].result
     step3_data = session.steps_data[3].result

@@ -310,7 +310,7 @@ def install_tcmalloc_instructions() -> str:
 
 def detect_numa_topology() -> dict[str, Any]:
     """检测 NUMA 拓扑，用于确定 CPU 绑核的最佳配置。"""
-    result = {
+    result: dict[str, Any] = {
         "available": False,
         "nodes": [],
         "cpu_count": 0,
@@ -513,7 +513,7 @@ class ProgressiveTuningExecutor:
         self.report.results.append(result)
         return result
 
-    def _generate_recommendations(self):
+    def _generate_recommendations(self) -> None:
         """根据调优结果生成建议"""
         failed = [r for r in self.report.results if r.status == "failed"]
         if failed:
@@ -1294,7 +1294,7 @@ def diagnose_bottleneck(profiling_summary: dict[str, Any]) -> dict[str, Any]:
 # ========== 代码层优化建议（ascend-optimization skill） ==========
 
 # torch_npu 亲和算子替换建议库
-_AFFINITY_OPERATOR_SUGGESTIONS = [
+_AFFINITY_OPERATOR_SUGGESTIONS: list[dict[str, Any]] = [
     {
         "path": "Norm 路径",
         "pattern": "RMSNorm / residual-add + LayerNorm",

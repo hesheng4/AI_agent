@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -49,10 +51,10 @@ class AssessResponse(BaseModel):
     review_result: str
     paper_type: str
     input_scope: str
-    strengths: list[dict] = Field(
+    strengths: list[dict[str, Any]] = Field(
         default_factory=list, description="结构化优点清单（B3）"
     )
-    improvement_suggestions: list[dict] = Field(
+    improvement_suggestions: list[dict[str, Any]] = Field(
         default_factory=list, description="结构化改进建议清单（B3）"
     )
 
@@ -71,7 +73,7 @@ class QuickCheckResponse(BaseModel):
 @router.post("/assess", response_model=AssessResponse)
 async def assess_manuscript(
     request: AssessRequest, current_user: User = Depends(get_current_user)
-):
+) -> AssessResponse:
     """模拟 Nature 风格审稿（3审稿人 + 交叉综述）"""
     logger.info(f"用户 {current_user.id} 模拟审稿: 类型={request.paper_type}")
 
@@ -99,7 +101,7 @@ async def assess_manuscript(
 @router.post("/quick-check", response_model=QuickCheckResponse)
 async def quick_check_manuscript(
     request: QuickCheckRequest, current_user: User = Depends(get_current_user)
-):
+) -> QuickCheckResponse:
     """快速预审检查"""
     logger.info(f"用户 {current_user.id} 快速预审")
 

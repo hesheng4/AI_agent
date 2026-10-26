@@ -91,7 +91,8 @@ export function setRefreshToken(token: string): void {
 export function isTokenExpired(token: string): boolean {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.exp ? Date.now() >= payload.exp * 1000 : false;
+    // 缺 exp 视为已过期（防伪造/异常 token 被当作永不过期）
+    return payload.exp ? Date.now() >= payload.exp * 1000 : true;
   } catch {
     return true;
   }
@@ -106,7 +107,22 @@ class ApiError extends Error {
 }
 
 // Token 过期 → 尝试 refresh，失败才清除
+// single-flight：并发 401 时只发一次 /auth/refresh。
+// 后端 refresh 每次轮换 refresh_token，若并发各自刷新，
+// 后返回者会把先返回者刚发的 token 作废 → 用户被意外登出。
+let _refreshInFlight: Promise<string | null> | null = null;
+
 async function refreshAccessToken(): Promise<string | null> {
+  if (_refreshInFlight) return _refreshInFlight;
+  _refreshInFlight = _doRefresh();
+  try {
+    return await _refreshInFlight;
+  } finally {
+    _refreshInFlight = null;
+  }
+}
+
+async function _doRefresh(): Promise<string | null> {
   const refresh = getRefreshToken();
   if (!refresh) return null;
   try {
@@ -659,11 +675,17 @@ export const coordinatorApi = {
       body: JSON.stringify({ task, content }),
     }),
   /** 多 Agent 编排（完整 process()）。task_id 传入则事件发布到该 id，
-   *  供调用方先建立 /ws/tasks/{task_id} 连接再发起请求。 */
-  orchestrate: (task: string, content = '', taskId?: string) =>
+   *  供调用方先建立 /ws/tasks/{task_id} 连接再发起请求。
+   *  saveArtifact=true 时编排结果持久化为产出物（结果存档页可回看）。 */
+  orchestrate: (task: string, content = '', taskId?: string, saveArtifact = false) =>
     request<OrchestrateResponse>('/coordinator/orchestrate', {
       method: 'POST',
-      body: JSON.stringify({ task, content, ...(taskId ? { task_id: taskId } : {}) }),
+      body: JSON.stringify({
+        task,
+        content,
+        ...(taskId ? { task_id: taskId } : {}),
+        ...(saveArtifact ? { save_artifact: true } : {}),
+      }),
     }),
 };
 
@@ -905,3 +927,76 @@ export const workflowsApi = {
 };
 
 export { ApiError };
+
+// ===== 产出物 API（结果持久化）=====
+export interface Artifact {
+  id: string;
+  agent: string;
+  title: string;
+  payload: Record<string, unknown>;
+  created_at: string | null;
+}
+
+export const artifactsApi = {
+  create: (data: { agent: string; title: string; payload: Record<string, unknown> }) =>
+    request<Artifact>('/artifacts/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  list: (params?: { agent?: string; limit?: number; offset?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.agent) qs.set('agent', params.agent);
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.offset) qs.set('offset', String(params.offset));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request<Artifact[]>(`/artifacts/${suffix}`);
+  },
+  get: (id: string) => request<Artifact>(`/artifacts/${id}`),
+  delete: (id: string) => request<{ status: string }>(`/artifacts/${id}`, { method: 'DELETE' }),
+};
+
+// ===== 分享与 fork API =====
+export interface ShareItem {
+  id: string;
+  resource_type: string;
+  resource_id: string;
+  expires_at: string | null;
+  revoked: boolean;
+  created_at: string | null;
+}
+
+export interface ShareCreateResult extends ShareItem {
+  token: string;
+}
+
+export interface SharedLibraryPreview {
+  resource_type: string;
+  owner: string;
+  paper_count: number;
+  papers: Array<{ title: string; year: number | null; journal: string | null; tags: string[]; category: string | null }>;
+  categories: string[];
+  tags: string[];
+  citation_count: number;
+}
+
+export interface ForkResult {
+  papers_added: number;
+  papers_skipped: number;
+  categories_created: number;
+  tags_created: number;
+  notes_copied: number;
+  citations_copied: number;
+  citations_skipped: number;
+}
+
+export const sharesApi = {
+  create: (data: { resource_type: string; resource_id?: string; ttl_days?: number | null }) =>
+    request<ShareCreateResult>('/shares/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  list: () => request<ShareItem[]>('/shares/'),
+  revoke: (id: string) => request<{ status: string }>(`/shares/${id}`, { method: 'DELETE' }),
+  preview: (token: string) => request<SharedLibraryPreview>(`/shares/by-token/${token}`),
+  fork: (token: string) => request<ForkResult>(`/shares/by-token/${token}/fork`, { method: 'POST' }),
+};

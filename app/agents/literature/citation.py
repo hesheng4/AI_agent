@@ -18,12 +18,15 @@ class CitationAnalyzer:
     """引用网络分析器"""
 
     @staticmethod
-    async def get_citations(paper_id: str, limit: int = 50) -> list[dict]:
+    async def get_citations(paper_id: str, limit: int = 50) -> list[dict[str, Any]]:
         """获取引用该论文的文献"""
         logger.info(f"获取引用: {paper_id}")
 
         url = f"{SEMANTIC_SCHOLAR_API}/paper/{paper_id}/citations"
-        params = {"fields": "title,authors,year,journal,citationCount", "limit": limit}
+        params: dict[str, Any] = {
+            "fields": "title,authors,year,journal,citationCount",
+            "limit": limit,
+        }
 
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT) as client:
@@ -62,12 +65,15 @@ class CitationAnalyzer:
             return []
 
     @staticmethod
-    async def get_references(paper_id: str, limit: int = 50) -> list[dict]:
+    async def get_references(paper_id: str, limit: int = 50) -> list[dict[str, Any]]:
         """获取该论文的参考文献"""
         logger.info(f"获取参考文献: {paper_id}")
 
         url = f"{SEMANTIC_SCHOLAR_API}/paper/{paper_id}/references"
-        params = {"fields": "title,authors,year,journal,citationCount", "limit": limit}
+        params: dict[str, Any] = {
+            "fields": "title,authors,year,journal,citationCount",
+            "limit": limit,
+        }
 
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT) as client:
@@ -193,7 +199,7 @@ class CitationAnalyzer:
             all_citations[pid] = set(c.get("id") for c in citations if c.get("id"))
 
         # 找共被引
-        co_citations = []
+        co_citations: list[dict[str, Any]] = []
         for i, pid1 in enumerate(paper_ids):
             for pid2 in paper_ids[i + 1 :]:
                 common = all_citations.get(pid1, set()) & all_citations.get(pid2, set())
@@ -224,7 +230,7 @@ class CitationAnalyzer:
         citations = await CitationAnalyzer.get_citations(paper_id, limit=500)
 
         # 按年份统计
-        year_counts = defaultdict(int)
+        year_counts: dict[Any, int] = defaultdict(int)
         for c in citations:
             year = c.get("year")
             if year:

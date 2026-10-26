@@ -22,7 +22,7 @@ from app.utils.exceptions import AgentException
 class StatsAgent(BaseAgent):
     """Nature-skills 驱动的统计报告 Agent"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="stats",
             tools=[

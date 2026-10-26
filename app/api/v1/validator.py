@@ -140,7 +140,7 @@ class BenchmarkThroughputRequest(BaseModel):
 
 
 @router.get("/status")
-async def validator_status():
+async def validator_status() -> dict[str, Any]:
     """验证模块状态"""
     return {
         "module": "ascend_validator",
@@ -159,7 +159,7 @@ async def validator_status():
 
 
 @router.get("/env-check")
-async def env_check():
+async def env_check() -> dict[str, Any]:
     """Step 1: 环境预检
 
     检查 NPU 驱动、vLLM 安装、昇腾设备可用性
@@ -169,7 +169,7 @@ async def env_check():
 
 
 @router.post("/deploy-command")
-async def deploy_command(req: ValidationRequest):
+async def deploy_command(req: ValidationRequest) -> dict[str, Any]:
     """Step 2: 生成 vLLM 服务启动命令
 
     生成包含环境变量和优化参数的完整启动命令
@@ -229,7 +229,7 @@ async def deploy_command(req: ValidationRequest):
 
 
 @router.post("/accuracy")
-async def accuracy_test(req: QuickAccuracyRequest):
+async def accuracy_test(req: QuickAccuracyRequest) -> dict[str, Any]:
     """Step 3.1: 精度验证
 
     通过 chat/completions API 验证模型基本推理能力
@@ -244,7 +244,7 @@ async def accuracy_test(req: QuickAccuracyRequest):
 
 
 @router.post("/benchmark/serve")
-async def benchmark_serve(req: BenchmarkServeRequest):
+async def benchmark_serve(req: BenchmarkServeRequest) -> dict[str, Any]:
     """Step 3.2a: serve 模式在线吞吐测试 (QPS, TTFT, TPOT)"""
     benchmark = BenchmarkConfig(
         input_len=req.input_len,
@@ -261,7 +261,7 @@ async def benchmark_serve(req: BenchmarkServeRequest):
 
 
 @router.post("/benchmark/latency")
-async def benchmark_latency(req: BenchmarkLatencyRequest):
+async def benchmark_latency(req: BenchmarkLatencyRequest) -> dict[str, Any]:
     """Step 3.2b: latency 模式单请求延迟测试 (P50/P90/P99)"""
     benchmark = BenchmarkConfig(
         input_len=req.input_len,
@@ -276,7 +276,7 @@ async def benchmark_latency(req: BenchmarkLatencyRequest):
 
 
 @router.post("/benchmark/throughput")
-async def benchmark_throughput(req: BenchmarkThroughputRequest):
+async def benchmark_throughput(req: BenchmarkThroughputRequest) -> dict[str, Any]:
     """Step 3.2c: throughput 模式离线吞吐测试 (tokens/sec)"""
     benchmark = BenchmarkConfig(
         input_len=req.input_len,
@@ -291,7 +291,7 @@ async def benchmark_throughput(req: BenchmarkThroughputRequest):
 
 
 @router.post("/run")
-async def run_full_validation(req: ValidationRequest):
+async def run_full_validation(req: ValidationRequest) -> dict[str, Any]:
     """一键执行完整验证流水线
 
     环境预检 → 模型部署 → 精度测试 → 性能基准 → 资源清理 → 报告生成
@@ -362,7 +362,7 @@ async def run_full_validation(req: ValidationRequest):
 
 
 @router.get("/models")
-async def supported_models():
+async def supported_models() -> dict[str, Any]:
     """列出支持的模型和预设配置"""
     return {
         "models": list_supported_models(),
@@ -396,7 +396,7 @@ async def supported_models():
 @router.post("/preset/{model_name}")
 async def run_preset_validation(
     model_name: str, model_path: str = "", port: int = 8000
-):
+) -> dict[str, Any]:
     """使用预设配置执行验证"""
     preset = get_preset_config(model_name)
     if not preset:
@@ -414,7 +414,7 @@ async def run_preset_validation(
 
 
 @router.get("/quick-reference")
-async def quick_reference():
+async def quick_reference() -> dict[str, Any]:
     """验证快速参考"""
     return {
         "workflow": [

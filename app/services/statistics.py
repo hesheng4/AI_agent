@@ -32,14 +32,14 @@ class StatisticsEnhancer:
         se = std_dev / math.sqrt(n) if n > 0 else 0
 
         # 偏度和峰度
-        skewness = 0
-        kurtosis = 0
+        skewness: float = 0
+        kurtosis: float = 0
         if n > 2 and std_dev > 0:
             skewness = sum((x - mean) ** 3 for x in values) / (n * std_dev**3)
             kurtosis = sum((x - mean) ** 4 for x in values) / (n * std_dev**4) - 3
 
         # 百分位数
-        def percentile(p):
+        def percentile(p: float) -> float:
             idx = p * (n - 1)
             lower = int(idx)
             upper = min(lower + 1, n - 1)
@@ -330,7 +330,7 @@ class StatisticsEnhancer:
         """双因素方差分析"""
 
         # 组织数据
-        groups = {}
+        groups: dict[tuple[Any, Any], list[float]] = {}
         for d in data:
             a_val = d.get(factor_a, "")
             b_val = d.get(factor_b, "")
@@ -350,10 +350,10 @@ class StatisticsEnhancer:
         grand_mean = sum(all_vals) / N if N > 0 else 0
 
         # 计算各SS
-        ss_a = 0
-        ss_b = 0
-        ss_ab = 0
-        ss_within = 0
+        ss_a: float = 0
+        ss_b: float = 0
+        ss_ab: float = 0
+        ss_within: float = 0
 
         # A因素均值
         a_means = {}
@@ -452,7 +452,7 @@ class StatisticsEnhancer:
         combined.sort(key=lambda x: x[0])
 
         # 计算秩
-        ranks = {1: 0, 2: 0}
+        ranks: dict[int, float] = {1: 0, 2: 0}
         i = 0
         while i < len(combined):
             j = i
@@ -518,7 +518,7 @@ class StatisticsEnhancer:
             i = j
 
         # H统计量
-        h_stat = 0
+        h_stat: float = 0
         for name in groups:
             ni = group_ns[name]
             ri = group_ranks[name]
@@ -570,7 +570,7 @@ class StatisticsEnhancer:
             return {"overall": result, "groups": None}
         else:
             # 分组分析
-            group_data = {}
+            group_data: dict[str, dict[str, list[Any]]] = {}
             for t, e, g in zip(times, events, group):
                 group_data.setdefault(g, {"times": [], "events": []})
                 group_data[g]["times"].append(t)
@@ -614,7 +614,7 @@ class StatisticsEnhancer:
 
         # 计算标准误 (Greenwood公式)
         se_curve = []
-        cum_var = 0
+        cum_var: float = 0
         n_at_risk = len(sorted_data)
         for i, (t, e) in enumerate(sorted_data):
             if e == 1 and n_at_risk > 1:
@@ -632,17 +632,19 @@ class StatisticsEnhancer:
         }
 
     @staticmethod
-    def _log_rank_test(group_data: dict[str, dict[str, list]]) -> dict[str, Any]:
+    def _log_rank_test(
+        group_data: dict[str, dict[str, list[Any]]]
+    ) -> dict[str, Any]:
         """Log-rank检验（简化版）"""
         # 收集所有唯一时间点
-        all_times = set()
+        all_times: Any = set()
         for g, data in group_data.items():
             all_times.update(data["times"])
         all_times = sorted(all_times)
 
         # 每个时间点计算O-E
-        total_oe = 0
-        total_var = 0
+        total_oe: float = 0
+        total_var: float = 0
 
         for t in all_times:
             # 各组在该时间点的事件数和风险数
@@ -748,9 +750,9 @@ class StatisticsEnhancer:
     @staticmethod
     def _spearman_correlation(x: list[float], y: list[float], n: int) -> dict[str, Any]:
         # 排名
-        def rank_data(data):
+        def rank_data(data: list[float]) -> list[float]:
             sorted_indices = sorted(range(len(data)), key=lambda i: data[i])
-            ranks = [0] * len(data)
+            ranks: list[float] = [0] * len(data)
             i = 0
             while i < len(sorted_indices):
                 j = i

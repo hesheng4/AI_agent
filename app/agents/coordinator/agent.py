@@ -42,7 +42,7 @@ _ROUTING_SYSTEM_PROMPT = (
 class CoordinatorAgent(BaseAgent):
     """Nature-skills 协调器 — 自动发现全部 Agent（E1 插件化）"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(name="coordinator")
         # 懒加载：仅存实例缓存，首次 get_agent 时才 import + 实例化
         self._agent_instances: dict[str, Any] = {}
@@ -76,6 +76,11 @@ class CoordinatorAgent(BaseAgent):
     async def process(self, request: dict[str, Any]) -> dict[str, Any]:
         """处理请求 - 支持并行执行 + 实时事件推送 + O5 链路追踪"""
         task_id = request.get("_task_id") or event_bus.new_task_id()
+        # WS 订阅归属登记： orchestrate 携带 _user_id 时登记 owner，
+        # 防止其他登录用户订阅任意 task_id 的事件（跨用户进度泄露）。
+        owner_id = request.get("_user_id")
+        if owner_id:
+            event_bus.register_owner(task_id, str(owner_id))
         # O5: 若上层未设 trace_context，在此补建（单 Agent 调用时）
         tid = request.get("_trace_id") or task_id
         with trace_context(tid):
@@ -153,6 +158,28 @@ class CoordinatorAgent(BaseAgent):
             final_result["task_id"] = task_id
             final_result["trace_id"] = tid
 
+            # 结果持久化（opt-in）：save_artifact=true 时把编排最终结果
+            # 存入 agent_artifacts，解决「上周的审稿回复找不回来」。
+            # 编排路径本身无 DB 会话，这里从全局会话工厂新建；
+            # 持久化失败不回滚编排结果（只记日志）。
+            if request.get("save_artifact") and request.get("_user_id"):
+                try:
+                    from app.core.database import async_session
+                    from app.services.artifact_service import ArtifactService
+
+                    task_text = str(request.get("task", ""))[:200]
+                    async with async_session() as session:
+                        await ArtifactService().create_artifact(
+                            session,
+                            str(request["_user_id"]),
+                            agent="coordinator",
+                            title=task_text or f"编排结果 {task_id}",
+                            payload=final_result,
+                        )
+                    final_result["artifact_saved"] = True
+                except Exception as e:  # noqa: BLE001 — 持久化失败不影响编排
+                    logger.warning(f"产出物保存失败: task_id={task_id}, err={e}")
+
             await event_bus.publish(
                 task_id, {"type": "done", "result": final_result, "trace_id": tid}
             )
@@ -160,12 +187,12 @@ class CoordinatorAgent(BaseAgent):
 
     async def _execute_plan_parallel(
         self,
-        execution_plan: list[dict],
+        execution_plan: list[dict[str, Any]],
         task_id: str = "",
         fail_fast: bool = False,
         run_recorder: RunRecorder | None = None,
-        completed_results: list[dict] | None = None,
-    ) -> list[dict]:
+        completed_results: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
         """并行执行计划，并将上游 Agent 结果注入下游任务请求
 
         fail_fast（模板驱动编排，Q12）：任一步失败即终止工作流，后续层级
@@ -176,7 +203,7 @@ class CoordinatorAgent(BaseAgent):
         [{agent, result}] — 这些步不再执行，其载荷直接作为上游上下文；
         run_recorder 提供时逐步落盘 checkpoint。
         """
-        results: list[dict] = []
+        results: list[dict[str, Any]] = []
         completed: set[str] = set()
         context: dict[str, dict[str, Any]] = {}
         for entry in completed_results or []:
@@ -342,7 +369,9 @@ class CoordinatorAgent(BaseAgent):
                 f"步骤 {task['agent']} 执行超过 {timeout}s 上限"
             ) from e
 
-    def _inject_upstream(self, task: dict, context: dict[str, dict[str, Any]]) -> dict:
+    def _inject_upstream(
+        self, task: dict[str, Any], context: dict[str, dict[str, Any]]
+    ) -> dict[str, Any]:
         """将上游 Agent 的成功结果注入当前任务请求
 
         字段级注入走声明式映射 UPSTREAM_FIELD_MAP（差距 #3）：
@@ -394,7 +423,9 @@ class CoordinatorAgent(BaseAgent):
             return None
         return src.get(src_field)
 
-    def _group_by_level(self, execution_plan: list[dict]) -> list[list[dict]]:
+    def _group_by_level(
+        self, execution_plan: list[dict[str, Any]]
+    ) -> list[list[dict[str, Any]]]:
         """按依赖层级分组任务"""
         levels = []
         completed = set()
@@ -425,7 +456,7 @@ class CoordinatorAgent(BaseAgent):
 
         return levels
 
-    async def _execute_single_task(self, task: dict) -> dict:
+    async def _execute_single_task(self, task: dict[str, Any]) -> dict[str, Any]:
         """执行单个任务（O5: span 包裹记录 agent + 耗时）"""
         agent_name = task["agent"]
         agent = self.get_agent(agent_name)  # 懒加载
@@ -466,14 +497,14 @@ class CoordinatorAgent(BaseAgent):
             raise
 
     def _integrate_results(
-        self, results: list[dict], fail_fast: bool = False
+        self, results: list[dict[str, Any]], fail_fast: bool = False
     ) -> dict[str, Any]:
         """整合结果
 
         fail_fast（模板驱动，Q12）：存在失败 ⇒ status=failed，error 指明
         失败步骤；非模板路径保持 partial_failure 语义。
         """
-        integrated = {
+        integrated: dict[str, Any] = {
             "agents_used": [],
             "results": {},
             "status": "success",

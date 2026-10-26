@@ -35,7 +35,9 @@ class CoverResponse(BaseModel):
 
 
 @router.post("/", response_model=CoverResponse)
-async def cover_endpoint(req: CoverRequest, user: User = Depends(get_current_user)):
+async def cover_endpoint(
+    req: CoverRequest, user: User = Depends(get_current_user)
+) -> CoverResponse:
     result = await _agent.process(
         {
             **req.model_dump(),

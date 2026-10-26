@@ -22,7 +22,7 @@ from app.utils.exceptions import AgentException
 class MethodsAgent(BaseAgent):
     """Nature-skills 驱动的 Methods 可复现性 Agent"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="methods",
             tools=["audit", "draft", "check_ethics", "remove_vague"],

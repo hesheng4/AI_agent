@@ -43,7 +43,7 @@ class ReadFullResponse(BaseModel):
 @router.post("/read-full", response_model=ReadFullResponse)
 async def read_full(
     request: ReadFullRequest, current_user: User = Depends(get_current_user)
-):
+) -> ReadFullResponse:
     """全文中英对照 Markdown Reader"""
     from app.agents.reader.agent import ReaderAgent
 

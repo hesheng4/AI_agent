@@ -1,5 +1,6 @@
 import ipaddress
 import secrets
+from typing import Any
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -84,7 +85,9 @@ def _validate_api_base_url(
         )
 
 
-def _is_disallowed_addr(addr: ipaddress._BaseAddress, allow_private: bool) -> bool:
+def _is_disallowed_addr(
+    addr: ipaddress.IPv4Address | ipaddress.IPv6Address, allow_private: bool
+) -> bool:
     """是否为应拒绝的地址（非 DEBUG 模式下拒绝私网/环回/链路本地/保留段）"""
     if allow_private:
         # DEBUG 下仍拒绝链路本地（169.254.0.0/16 含云元数据）与未指定地址
@@ -248,7 +251,7 @@ class UpdateApiConfigRequest(BaseModel):
 @router.post("/login", response_model=TokenResponse)
 async def login(
     request: LoginRequest, raw_request: Request, db: AsyncSession = Depends(get_db)
-):
+) -> TokenResponse:
     # 限流与账户锁定检查
     await _check_login_rate_limit(raw_request, request.email)
 
@@ -271,7 +274,9 @@ async def login(
 
 
 @router.post("/register", response_model=UserResponse)
-async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(
+    request: RegisterRequest, db: AsyncSession = Depends(get_db)
+) -> UserResponse:
     auth_service = AuthService(db)
 
     result = await db.execute(select(User).where(User.email == request.email))
@@ -299,7 +304,7 @@ class RefreshRequest(BaseModel):
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token_endpoint(
     request: RefreshRequest, db: AsyncSession = Depends(get_db)
-):
+) -> TokenResponse:
     """以 refresh token 换取新 access token（S1/M2）
 
     refresh token 必须有效且 `type=refresh`；用户仍须存在且 is_active。
@@ -332,7 +337,7 @@ async def refresh_token_endpoint(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(current_user: User = Depends(get_current_user)) -> UserResponse:
     return UserResponse.from_user(current_user)
 
 
@@ -353,7 +358,7 @@ async def patch_me(
     request: PatchMeRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> UserResponse:
     """部分更新当前用户资料（前端 PATCH /auth/me 对应此端点）"""
     if request.username is not None:
         result = await db.execute(
@@ -394,7 +399,7 @@ async def update_profile(
     request: UpdateProfileRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> UserResponse:
     """更新个人资料"""
     if request.username is not None:
         # 检查用户名是否已被占用
@@ -426,7 +431,7 @@ async def change_password(
     request: ChangePasswordRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, str]:
     """修改密码"""
     if not verify_password(request.old_password, current_user.hashed_password):
         raise HTTPException(
@@ -448,7 +453,7 @@ async def forgot_password(
     request: ForgotPasswordRequest,
     raw_request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """忘记密码 — 生成重置令牌
 
     无论邮箱是否注册，都返回相同响应（防止邮箱枚举）。
@@ -497,7 +502,7 @@ async def forgot_password(
 async def reset_password(
     request: ResetPasswordRequest,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, str]:
     """重置密码 — 使用重置令牌设置新密码"""
     # 从缓存取出 user_id
     user_id = await cache.get(_reset_token_cache_key(request.token))
@@ -539,7 +544,7 @@ async def update_api_config(
     request: UpdateApiConfigRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> UserResponse:
     """配置个人 API 密钥（接入自己的 LLM API）"""
     # SSRF 防护：校验 base_url 不指向内网/保留地址
     _validate_api_base_url(request.api_base_url)
@@ -562,7 +567,7 @@ async def update_api_config(
 async def test_api_config(
     request: UpdateApiConfigRequest,
     current_user: User = Depends(get_current_user),
-):
+) -> dict[str, Any]:
     """测试个人 API 配置是否可用"""
     from openai import AsyncOpenAI
 
@@ -608,5 +613,5 @@ async def test_api_config(
 
 
 @router.get("/health")
-async def health_check():
+async def health_check() -> dict[str, str]:
     return {"status": "healthy"}

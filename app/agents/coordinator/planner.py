@@ -416,7 +416,7 @@ class TaskPlanner:
                     queue.append(dep)
         return result
 
-    def validate_template(self, template_id: str, template: dict) -> None:
+    def validate_template(self, template_id: str, template: dict[str, Any]) -> None:
         """模板合法性校验：id 在册 + 同一 Agent 不得出现多次
 
         当前调度模型每个 Agent 只执行一个任务、上游结果经注入下传；
@@ -443,7 +443,9 @@ class TaskPlanner:
                 "coordinator",
             )
 
-    def decompose_task(self, request: dict[str, Any], agents: list[str]) -> list[dict]:
+    def decompose_task(
+        self, request: dict[str, Any], agents: list[str]
+    ) -> list[dict[str, Any]]:
         """分解任务
 
         - 模板驱动（request 含 workflow_template）：按模板步骤逐步展开，
@@ -471,10 +473,10 @@ class TaskPlanner:
         return subtasks
 
     def _decompose_template(
-        self, request: dict[str, Any], template: dict
-    ) -> list[dict]:
+        self, request: dict[str, Any], template: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """模板展开为逐步子任务：步骤顺序即执行顺序，依赖取前缀"""
-        subtasks: list[dict] = []
+        subtasks: list[dict[str, Any]] = []
         prior_agents: list[str] = []
         for step in template["steps"]:
             agent_name = step["agent"]
@@ -505,7 +507,9 @@ class TaskPlanner:
                 return value[:200]
         return "相关领域综述"
 
-    def analyze_dependencies(self, subtasks: list[dict]) -> list[dict]:
+    def analyze_dependencies(
+        self, subtasks: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """分析依赖关系 — 使用扩展依赖表"""
         execution_plan = []
         for subtask in subtasks:

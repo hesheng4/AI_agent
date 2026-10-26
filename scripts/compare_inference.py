@@ -320,7 +320,7 @@ async def compare_embedding_inference(
 
 def generate_report(
     results: list[dict[str, Any]], output_path: str, metadata: dict[str, Any]
-):
+) -> None:
     """生成精度对齐报告"""
     report = {
         "report_date": datetime.now().isoformat(),
@@ -386,7 +386,7 @@ def generate_report(
         print("\n  ⚠️ 注意: CPU 调试对比不作为最终精度对齐结论")
 
 
-async def main():
+async def main() -> None:
     parser = argparse.ArgumentParser(description="精度对齐推理对比")
     parser.add_argument(
         "--baseline-url", required=True, help="基线服务 URL（GPU/官方）"

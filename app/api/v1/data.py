@@ -59,7 +59,7 @@ class UploadResponse(BaseModel):
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_data(
     request: AnalyzeRequest, current_user: User = Depends(get_current_user)
-):
+) -> AnalyzeResponse:
     """数据分析"""
     logger.info(f"用户 {current_user.id} 执行分析: {request.analysis_type}")
 
@@ -80,7 +80,7 @@ async def analyze_data(
 @router.post("/visualize", response_model=VisualizeResponse)
 async def visualize_data(
     request: VisualizeRequest, current_user: User = Depends(get_current_user)
-):
+) -> VisualizeResponse:
     """可视化建议"""
     logger.info(f"用户 {current_user.id} 请求可视化: {request.chart_type}")
 
@@ -95,7 +95,7 @@ async def visualize_data(
 @router.post("/upload", response_model=UploadResponse)
 async def upload_data(
     request: UploadRequest, current_user: User = Depends(get_current_user)
-):
+) -> UploadResponse:
     """上传数据"""
     logger.info(f"用户 {current_user.id} 上传数据: {request.filename}")
 

@@ -30,7 +30,7 @@ class VectorStoreException(AppException):
 class VectorStore:
     """向量存储（Milvus）"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.host = settings.MILVUS_HOST
         self.port = settings.MILVUS_PORT
         self.client = None
@@ -40,7 +40,7 @@ class VectorStore:
         # 连接锁，防止并发首次连接；懒初始化避免跨事件循环复用
         self._connect_lock: asyncio.Lock | None = None
 
-    async def connect(self):
+    async def connect(self) -> bool:
         """连接 Milvus（线程安全，可重复调用）"""
         if self._connected:
             return True
@@ -50,7 +50,9 @@ class VectorStore:
             if self._connected:
                 return True
             try:
-                from pymilvus import connections
+                from pymilvus import (  # type: ignore[import-untyped]  # pymilvus
+                    connections,
+                )
 
                 # pymilvus 的 connections.connect 是同步阻塞调用
                 await asyncio.to_thread(
@@ -90,18 +92,20 @@ class VectorStore:
             logger.warning(f"list_collections 失败: {e}")
             return []
 
-    async def _ensure_connected(self):
+    async def _ensure_connected(self) -> None:
         """确保已连接，未连接则尝试连接"""
         if not self._connected:
             ok = await self.connect()
             if not ok:
                 raise VectorStoreException("Milvus未连接且自动连接失败")
 
-    async def create_collection(self, collection_name: str, dimension: int = 768):
+    async def create_collection(
+        self, collection_name: str, dimension: int = 768
+    ) -> None:
         """创建集合"""
         await self._ensure_connected()
 
-        def _sync_create():
+        def _sync_create() -> Any:
             from pymilvus import Collection, CollectionSchema, DataType, FieldSchema
 
             fields = [
@@ -141,7 +145,7 @@ class VectorStore:
         collection_name: str,
         texts: list[str],
         embeddings: list[list[float]],
-        metadatas: list[dict] | None = None,
+        metadatas: list[dict[str, Any]] | None = None,
     ) -> list[str]:
         """插入数据"""
         await self._ensure_connected()
@@ -155,7 +159,7 @@ class VectorStore:
         else:
             data.append([{}] * len(texts))
 
-        def _sync_insert():
+        def _sync_insert() -> Any:
             from pymilvus import Collection
 
             collection = Collection(collection_name)
@@ -184,7 +188,7 @@ class VectorStore:
         """向量搜索"""
         await self._ensure_connected()
 
-        def _sync_search():
+        def _sync_search() -> list[dict[str, Any]]:
             from pymilvus import Collection
 
             collection = Collection(collection_name)
@@ -225,7 +229,7 @@ class VectorStore:
             logger.error(f"向量搜索失败: {e}")
             raise VectorStoreException(f"向量搜索失败: {str(e)}")
 
-    async def delete(self, collection_name: str, ids: list[str]):
+    async def delete(self, collection_name: str, ids: list[str]) -> None:
         """删除数据
 
         安全说明：Milvus 删除表达式不支持参数化绑定，ids 通过 str(list)
@@ -241,7 +245,7 @@ class VectorStore:
 
         expr = "id in " + str(safe_ids)
 
-        def _sync_delete():
+        def _sync_delete() -> None:
             from pymilvus import Collection
 
             collection = Collection(collection_name)
@@ -254,11 +258,11 @@ class VectorStore:
             logger.error(f"数据删除失败: {e}")
             raise VectorStoreException(f"数据删除失败: {str(e)}")
 
-    async def drop_collection(self, collection_name: str):
+    async def drop_collection(self, collection_name: str) -> None:
         """删除集合"""
         await self._ensure_connected()
 
-        def _sync_drop():
+        def _sync_drop() -> None:
             from pymilvus import Collection, utility
 
             if utility.has_collection(collection_name):
@@ -272,7 +276,7 @@ class VectorStore:
             logger.error(f"集合删除失败: {e}")
             raise VectorStoreException(f"集合删除失败: {str(e)}")
 
-    async def close(self):
+    async def close(self) -> None:
         """断开连接"""
         if not self._connected:
             return

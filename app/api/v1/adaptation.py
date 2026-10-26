@@ -138,7 +138,7 @@ class Step8InferenceRequest(BaseModel):
 
 
 @router.get("/status")
-async def get_adaptation_status():
+async def get_adaptation_status() -> dict[str, Any]:
     """查看模型适配模块状态"""
     sessions = list_sessions()
     return {
@@ -163,7 +163,7 @@ async def get_adaptation_status():
 
 
 @router.post("/sessions")
-async def create_adaptation_session(req: CreateSessionRequest):
+async def create_adaptation_session(req: CreateSessionRequest) -> dict[str, Any]:
     """创建适配会话（Step 1: 收集上下文）
 
     创建新的适配会话并初始化 10 步流程。
@@ -183,7 +183,7 @@ async def create_adaptation_session(req: CreateSessionRequest):
 
 
 @router.get("/sessions")
-async def list_adaptation_sessions():
+async def list_adaptation_sessions() -> dict[str, Any]:
     """列出所有适配会话"""
     return {
         "count": len(list_sessions()),
@@ -192,7 +192,7 @@ async def list_adaptation_sessions():
 
 
 @router.get("/sessions/{session_id}")
-async def get_adaptation_session(session_id: str):
+async def get_adaptation_session(session_id: str) -> dict[str, Any]:
     """获取会话详情"""
     session = get_session(session_id)
     if not session:
@@ -201,7 +201,7 @@ async def get_adaptation_session(session_id: str):
 
 
 @router.post("/sessions/{session_id}/step1")
-async def run_step1(session_id: str, req: Step1ContextRequest):
+async def run_step1(session_id: str, req: Step1ContextRequest) -> dict[str, Any]:
     """Step 1: 收集上下文信息
 
     补充或更新上下文信息（模型路径、实现根目录、交付仓库等）。
@@ -220,7 +220,7 @@ async def run_step1(session_id: str, req: Step1ContextRequest):
     if req.vllm_path:
         _validate_path_safety(req.vllm_path, "vllm_path")
 
-    context = {}
+    context: dict[str, Any] = {}
     if req.model_path:
         context["model_path"] = req.model_path
     if req.implementation_root:
@@ -239,7 +239,7 @@ async def run_step1(session_id: str, req: Step1ContextRequest):
 
 
 @router.post("/sessions/{session_id}/step2")
-async def run_step2(session_id: str):
+async def run_step2(session_id: str) -> dict[str, Any]:
     """Step 2: 分析模型
 
     读取 config.json，推断架构类型、注意力变体、量化类型、key prefix。
@@ -253,7 +253,7 @@ async def run_step2(session_id: str):
 
 
 @router.post("/sessions/{session_id}/step3")
-async def run_step3(session_id: str, req: Step3OperatorGateRequest):
+async def run_step3(session_id: str, req: Step3OperatorGateRequest) -> dict[str, Any]:
     """Step 3: 算子兼容性门控
 
     扫描代码中的算子类型，分类为 Torch/Triton/CUDA。
@@ -268,7 +268,9 @@ async def run_step3(session_id: str, req: Step3OperatorGateRequest):
 
 
 @router.post("/sessions/{session_id}/step4")
-async def run_step4(session_id: str, req: Step4FrameworkAnalysisRequest):
+async def run_step4(
+    session_id: str, req: Step4FrameworkAnalysisRequest
+) -> dict[str, Any]:
     """Step 4: 框架侧代码分析
 
     检查 vLLM registry.py 中是否已有架构注册，检查 vllm-ascend 补丁。
@@ -285,7 +287,7 @@ async def run_step4(session_id: str, req: Step4FrameworkAnalysisRequest):
 
 
 @router.post("/sessions/{session_id}/step5")
-async def run_step5(session_id: str):
+async def run_step5(session_id: str) -> dict[str, Any]:
     """Step 5: 选择适配策略
 
     基于 step 2-4 结果自动判断策略：reuse/patch/new_adapter/blocked。
@@ -299,7 +301,7 @@ async def run_step5(session_id: str):
 
 
 @router.post("/sessions/{session_id}/step6")
-async def run_step6(session_id: str, req: Step6ImplementRequest):
+async def run_step6(session_id: str, req: Step6ImplementRequest) -> dict[str, Any]:
     """Step 6: 实现最小代码改动
 
     根据适配策略生成适配器代码模板。
@@ -313,7 +315,7 @@ async def run_step6(session_id: str, req: Step6ImplementRequest):
 
 
 @router.post("/sessions/{session_id}/step7-dummy")
-async def run_step7_dummy(session_id: str, req: Step7DummyRequest):
+async def run_step7_dummy(session_id: str, req: Step7DummyRequest) -> dict[str, Any]:
     """Step 7a: Dummy Fast Gate
 
     生成 vllm serve --load-format dummy 命令，快速验证模型加载流程。
@@ -335,7 +337,7 @@ async def run_step7_dummy(session_id: str, req: Step7DummyRequest):
 
 
 @router.post("/sessions/{session_id}/step7-real")
-async def run_step7_real(session_id: str, req: Step7RealRequest):
+async def run_step7_real(session_id: str, req: Step7RealRequest) -> dict[str, Any]:
     """Step 7b: Real-Weight Mandatory Gate
 
     使用实际权重验证模型加载和推理。
@@ -358,7 +360,7 @@ async def run_step7_real(session_id: str, req: Step7RealRequest):
 
 
 @router.post("/sessions/{session_id}/step8")
-async def run_step8(session_id: str, req: Step8InferenceRequest):
+async def run_step8(session_id: str, req: Step8InferenceRequest) -> dict[str, Any]:
     """Step 8: 验证推理和功能
 
     生成 curl 测试命令，验证模型推理能力。
@@ -372,7 +374,7 @@ async def run_step8(session_id: str, req: Step8InferenceRequest):
 
 
 @router.post("/sessions/{session_id}/step9")
-async def run_step9(session_id: str):
+async def run_step9(session_id: str) -> dict[str, Any]:
     """Step 9: 生成产物
 
     生成 YAML 配置、文档、提交命令。
@@ -386,7 +388,7 @@ async def run_step9(session_id: str):
 
 
 @router.post("/sessions/{session_id}/step10")
-async def run_step10(session_id: str):
+async def run_step10(session_id: str) -> dict[str, Any]:
     """Step 10: 交接产物
 
     汇总所有步骤结果，生成交接报告。
@@ -400,6 +402,6 @@ async def run_step10(session_id: str):
 
 
 @router.get("/quick-reference")
-async def adaptation_quick_reference():
+async def adaptation_quick_reference() -> dict[str, Any]:
     """获取 adapt-agent 快速参考"""
     return get_quick_reference()

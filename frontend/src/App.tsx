@@ -40,6 +40,8 @@ const ResponsePage = lazy(() => import('./pages/Response'));
 const ReviewLoopPage = lazy(() => import('./pages/ReviewLoop'));
 const CitationPage = lazy(() => import('./pages/Citation'));
 const ExportPage = lazy(() => import('./pages/Export'));
+const ArtifactsPage = lazy(() => import('./pages/Artifacts'));
+const SharesPage = lazy(() => import('./pages/Shares'));
 // Batch 3
 const FigurePage = lazy(() => import('./pages/Figure'));
 const Paper2PPT = lazy(() => import('./pages/Paper2PPT'));
@@ -131,6 +133,8 @@ export default function App() {
               <Route path="polishing" element={<Suspense fallback={<PageLoader />}><PolishingPage /></Suspense>} />
               <Route path="stats" element={<Suspense fallback={<PageLoader />}><StatsPage /></Suspense>} />
               <Route path="data-availability" element={<Suspense fallback={<PageLoader />}><DataAvailability /></Suspense>} />
+              <Route path="artifacts" element={<Suspense fallback={<PageLoader />}><ArtifactsPage /></Suspense>} />
+              <Route path="shares" element={<Suspense fallback={<PageLoader />}><SharesPage /></Suspense>} />
               {/* 个人中心 */}
               <Route path="profile" element={<Suspense fallback={<PageLoader />}><Profile /></Suspense>} />
               {/* 昇腾工作台 */}

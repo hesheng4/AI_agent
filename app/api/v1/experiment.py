@@ -81,7 +81,7 @@ class StatisticalTestRequest(BaseModel):
 @router.post("/design", response_model=DesignResponse)
 async def design_experiment(
     request: DesignRequest, current_user: User = Depends(get_current_user)
-):
+) -> DesignResponse:
     """设计实验方案"""
     logger.info(f"用户 {current_user.id} 设计实验: {request.research_goal}")
 
@@ -105,7 +105,7 @@ async def design_experiment(
 @router.post("/optimize", response_model=OptimizeResponse)
 async def optimize_parameters(
     request: OptimizeRequest, current_user: User = Depends(get_current_user)
-):
+) -> OptimizeResponse:
     """参数优化"""
     logger.info(f"用户 {current_user.id} 优化参数")
 
@@ -128,7 +128,7 @@ async def optimize_parameters(
 @router.post("/predict", response_model=PredictResponse)
 async def predict_result(
     request: PredictRequest, current_user: User = Depends(get_current_user)
-):
+) -> PredictResponse:
     """结果预测"""
     logger.info(f"用户 {current_user.id} 预测结果")
 
@@ -151,7 +151,7 @@ async def predict_result(
 @router.post("/power-analysis", response_model=PowerAnalysisResponse)
 async def power_analysis(
     request: PowerAnalysisRequest, current_user: User = Depends(get_current_user)
-):
+) -> PowerAnalysisResponse:
     """功效分析"""
     logger.info(f"用户 {current_user.id} 功效分析")
 
@@ -166,7 +166,7 @@ async def power_analysis(
 @router.post("/statistical-test", response_model=StatisticalTestResponse)
 async def recommend_statistical_test(
     request: StatisticalTestRequest, current_user: User = Depends(get_current_user)
-):
+) -> StatisticalTestResponse:
     """推荐统计检验方法"""
     logger.info(f"用户 {current_user.id} 获取统计检验推荐")
 

@@ -149,7 +149,7 @@ def _get_session(session_id: str) -> DebugSession:
 
 
 @router.get("/status")
-async def debugging_status():
+async def debugging_status() -> dict[str, Any]:
     """模块状态"""
     return {
         "module": "systematic_debugging",
@@ -189,7 +189,7 @@ async def debugging_status():
 
 
 @router.get("/sessions")
-async def list_sessions():
+async def list_sessions() -> dict[str, Any]:
     """列出所有调试会话"""
     return {
         "sessions": _session_manager.list_sessions(),
@@ -198,14 +198,14 @@ async def list_sessions():
 
 
 @router.post("/sessions")
-async def create_session(req: CreateSessionRequest):
+async def create_session(req: CreateSessionRequest) -> dict[str, Any]:
     """创建新调试会话"""
     session = _session_manager.create_session(req.title)
     return session.to_dict()
 
 
 @router.get("/sessions/{session_id}")
-async def get_session(session_id: str):
+async def get_session(session_id: str) -> dict[str, Any]:
     """获取会话详情"""
     session = _get_session(session_id)
     return session.to_dict()
@@ -215,7 +215,7 @@ async def get_session(session_id: str):
 
 
 @router.post("/phase1/read-error")
-async def read_error(req: ReadErrorRequest):
+async def read_error(req: ReadErrorRequest) -> dict[str, Any]:
     """Phase 1: 仔细阅读错误信息
 
     不要跳过任何错误或警告，它们往往包含精确解决方案
@@ -227,7 +227,7 @@ async def read_error(req: ReadErrorRequest):
 
 
 @router.post("/phase1/parse-trace")
-async def parse_trace(req: ParseTraceRequest):
+async def parse_trace(req: ParseTraceRequest) -> dict[str, Any]:
     """Phase 1: 完整阅读堆栈跟踪"""
     session = _get_session(req.session_id)
     investigator = RootCauseInvestigator(session)
@@ -236,7 +236,7 @@ async def parse_trace(req: ParseTraceRequest):
 
 
 @router.post("/phase1/repro-steps")
-async def add_repro_steps(req: AddReproStepsRequest):
+async def add_repro_steps(req: AddReproStepsRequest) -> dict[str, Any]:
     """Phase 1: 记录复现步骤
 
     能可靠触发吗？精确步骤是什么？每次都发生吗？
@@ -252,7 +252,7 @@ async def add_repro_steps(req: AddReproStepsRequest):
 
 
 @router.post("/phase1/recent-changes")
-async def check_recent_changes(req: CheckRecentChangesRequest):
+async def check_recent_changes(req: CheckRecentChangesRequest) -> dict[str, Any]:
     """Phase 1: 检查最近变更
 
     什么变更可能导致这个问题？
@@ -267,7 +267,9 @@ async def check_recent_changes(req: CheckRecentChangesRequest):
 
 
 @router.post("/phase1/boundary-evidence")
-async def gather_boundary_evidence(req: GatherBoundaryEvidenceRequest):
+async def gather_boundary_evidence(
+    req: GatherBoundaryEvidenceRequest
+) -> dict[str, Any]:
     """Phase 1: 收集组件边界证据
 
     多组件系统中，在每个边界记录数据进出和环境/配置传播
@@ -284,7 +286,7 @@ async def gather_boundary_evidence(req: GatherBoundaryEvidenceRequest):
 
 
 @router.post("/phase1/trace-root-cause")
-async def trace_root_cause(req: TraceRootCauseRequest):
+async def trace_root_cause(req: TraceRootCauseRequest) -> dict[str, Any]:
     """Phase 1: 追溯根因
 
     从错误点向上追踪，找到坏值的原始来源。
@@ -302,7 +304,7 @@ async def trace_root_cause(req: TraceRootCauseRequest):
 
 
 @router.post("/phase1/summarize-root-cause")
-async def summarize_root_cause(req: SummarizeRootCauseRequest):
+async def summarize_root_cause(req: SummarizeRootCauseRequest) -> dict[str, Any]:
     """Phase 1 完成: 总结根因
 
     完成 Phase 1 后才能进入 Phase 2
@@ -329,7 +331,7 @@ async def summarize_root_cause(req: SummarizeRootCauseRequest):
 
 
 @router.post("/phase2/working-example")
-async def add_working_example(req: AddWorkingExampleRequest):
+async def add_working_example(req: AddWorkingExampleRequest) -> dict[str, Any]:
     """Phase 2: 添加工作示例
 
     什么工作代码与损坏代码类似？
@@ -344,7 +346,7 @@ async def add_working_example(req: AddWorkingExampleRequest):
 
 
 @router.post("/phase2/compare")
-async def compare_broken_working(req: CompareBrokenWorkingRequest):
+async def compare_broken_working(req: CompareBrokenWorkingRequest) -> dict[str, str]:
     """Phase 2: 对比损坏与工作代码
 
     每个差异都列出来，无论多小
@@ -360,7 +362,7 @@ async def compare_broken_working(req: CompareBrokenWorkingRequest):
 
 
 @router.post("/phase2/dependencies")
-async def analyze_dependencies(req: AnalyzeDependenciesRequest):
+async def analyze_dependencies(req: AnalyzeDependenciesRequest) -> dict[str, Any]:
     """Phase 2: 分析依赖关系
 
     需要什么其他组件？什么配置、环境？什么假设？
@@ -375,7 +377,7 @@ async def analyze_dependencies(req: AnalyzeDependenciesRequest):
 
 
 @router.post("/phase3/hypothesis")
-async def form_hypothesis(req: FormHypothesisRequest):
+async def form_hypothesis(req: FormHypothesisRequest) -> dict[str, Any]:
     """Phase 3: 形成单一假设
 
     '我认为 X 是根因，因为 Y' — 必须明确，不能模糊
@@ -387,7 +389,7 @@ async def form_hypothesis(req: FormHypothesisRequest):
 
 
 @router.post("/phase3/test-hypothesis")
-async def test_hypothesis(req: TestHypothesisRequest):
+async def test_hypothesis(req: TestHypothesisRequest) -> dict[str, Any]:
     """Phase 3: 测试假设 — 最小变更，一个变量
 
     确认 → Phase 4; 拒绝 → 新假设; 不确定 → 收集更多证据
@@ -404,7 +406,7 @@ async def test_hypothesis(req: TestHypothesisRequest):
 
 
 @router.get("/phase3/next-action/{session_id}")
-async def get_next_action(session_id: str):
+async def get_next_action(session_id: str) -> dict[str, Any]:
     """Phase 3: 获取下一步建议"""
     session = _get_session(session_id)
     tester = HypothesisTester(session)
@@ -416,7 +418,7 @@ async def get_next_action(session_id: str):
 
 
 @router.post("/phase4/failing-test")
-async def create_failing_test(req: CreateFailingTestRequest):
+async def create_failing_test(req: CreateFailingTestRequest) -> dict[str, Any]:
     """Phase 4: 创建失败测试用例
 
     修复前必须有失败测试用例
@@ -428,7 +430,7 @@ async def create_failing_test(req: CreateFailingTestRequest):
 
 
 @router.post("/phase4/apply-fix")
-async def apply_fix(req: ApplyFixRequest):
+async def apply_fix(req: ApplyFixRequest) -> dict[str, Any]:
     """Phase 4: 应用单点修复
 
     一次只修一个根因，不要"顺手"重构
@@ -453,7 +455,7 @@ async def apply_fix(req: ApplyFixRequest):
 
 
 @router.post("/phase4/question-architecture")
-async def question_architecture(req: QuestionArchitectureRequest):
+async def question_architecture(req: QuestionArchitectureRequest) -> dict[str, Any]:
     """Phase 4: 3+ 次修复失败后质疑架构
 
     这不是假设失败 — 这是架构错误
@@ -473,7 +475,7 @@ async def question_architecture(req: QuestionArchitectureRequest):
 
 
 @router.post("/quick-diagnose")
-async def quick_diagnose_endpoint(req: QuickDiagnoseRequest):
+async def quick_diagnose_endpoint(req: QuickDiagnoseRequest) -> dict[str, Any]:
     """快速诊断 — 从错误信息自动提取关键线索
 
     Phase 1 辅助工具
@@ -482,7 +484,7 @@ async def quick_diagnose_endpoint(req: QuickDiagnoseRequest):
 
 
 @router.get("/report/{session_id}")
-async def get_report(session_id: str):
+async def get_report(session_id: str) -> dict[str, Any]:
     """生成调试报告"""
     session = _get_session(session_id)
     report = generate_debug_report(session)
@@ -490,7 +492,7 @@ async def get_report(session_id: str):
 
 
 @router.get("/red-flags/{session_id}")
-async def get_red_flags(session_id: str):
+async def get_red_flags(session_id: str) -> dict[str, Any]:
     """检查红旗"""
     session = _get_session(session_id)
     investigator = RootCauseInvestigator(session)
@@ -504,7 +506,7 @@ async def get_red_flags(session_id: str):
 
 
 @router.get("/quick-reference")
-async def quick_reference():
+async def quick_reference() -> dict[str, Any]:
     """快速参考"""
     return {
         "iron_law": "NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST",

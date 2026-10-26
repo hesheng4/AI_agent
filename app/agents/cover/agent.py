@@ -23,7 +23,7 @@ class CoverAgent(BaseAgent):
     # 投稿信属半确定性任务（同输入应产出稳定结构），低温保证格式与措辞可复现
     _DETERMINISTIC_TEMPERATURE = 0.0
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="cover",
             tools=["draft", "audit", "presubmission"],

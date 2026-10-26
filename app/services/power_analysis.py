@@ -333,7 +333,7 @@ class PowerAnalysis:
 
     @staticmethod
     def sensitivity_analysis(
-        n_range: list[int] = None,
+        n_range: list[int] | None = None,
         alpha: float = 0.05,
         power: float = 0.8,
         test_type: str = "ttest",

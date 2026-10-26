@@ -3,7 +3,7 @@ import math
 from typing import Any
 
 import numpy as np
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]  # pandas-stubs 未安装
 
 from app.agents.base import BaseAgent
 from app.agents.data.prompts import ANALYSIS_SYSTEM_PROMPT, VISUALIZATION_SYSTEM_PROMPT
@@ -34,7 +34,7 @@ class DataAgent(BaseAgent):
     # 数据分析解释属半确定性任务，低温保证结论可复现
     _DETERMINISTIC_TEMPERATURE = 0.0
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="data",
             tools=[
@@ -102,8 +102,8 @@ class DataAgent(BaseAgent):
                 raise ValidationException("分组分析需要group_col和value_col参数")
             results = self.tools_handler.group_comparison(df, group_col, value_col)
         elif analysis_type == "regression":
-            x_cols = request.get("x_cols")
-            y_col = request.get("y_col")
+            x_cols: Any = request.get("x_cols")
+            y_col: Any = request.get("y_col")
             multiple = request.get("multiple", False)
             results = self.tools_handler.regression_analysis(
                 df, x_cols, y_col, multiple=multiple

@@ -11,7 +11,7 @@ from app.utils.exceptions import AgentException
 
 
 class ExperimentAgent(BaseAgent):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(name="experiment", tools=["design", "optimize", "predict"])
         self.tools_handler = ExperimentTools()
 

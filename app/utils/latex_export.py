@@ -26,7 +26,7 @@ class LaTeXExporter:
     }
 
     # 期刊级配置
-    JOURNAL_CONFIG = {
+    JOURNAL_CONFIG: dict[str, dict[str, Any]] = {
         "standard": {
             "doc_class": "article",
             "extra_packages": [],
@@ -88,12 +88,12 @@ class LaTeXExporter:
         title: str = "",
         authors: str = "",
         abstract: str = "",
-        keywords: list[str] = None,
+        keywords: list[str] | None = None,
         journal: str = "standard",
         paper_type: str = "research",
         outline: dict[str, Any] | None = None,
         terminology_ledger: dict[str, Any] | None = None,
-        references: list[str] = None,
+        references: list[str] | None = None,
     ) -> str:
         """将论文内容导出为 LaTeX 源码
 
@@ -446,7 +446,7 @@ class LaTeXExporter:
     @staticmethod
     def _extract_section_content(
         text: str, section_name: str, start_pos: int = 0
-    ) -> tuple:
+    ) -> tuple[str, int]:
         """从文本中提取指定章节的内容"""
         # 尝试匹配 Markdown 标题或纯文本标题
         patterns = [
@@ -503,7 +503,7 @@ class LaTeXExporter:
 
         # 超链接 [text](url)（hyperref 已在 preamble 声明）
         # URL 内的特殊字符需转义（_ % # 等），hyperref 的 \url 更稳健但 \href 需转义
-        def _href_repl(m):
+        def _href_repl(m: re.Match[str]) -> str:
             url = LaTeXExporter._escape_latex(m.group(2))
             link_text = LaTeXExporter._escape_latex(m.group(1))
             return f"\\href{{{url}}}{{{link_text}}}"
@@ -569,7 +569,7 @@ class LaTeXExporter:
         latex_commands = []
         placeholder_idx = 0
 
-        def save_latex(m):
+        def save_latex(m: re.Match[str]) -> str:
             nonlocal placeholder_idx
             # 占位符必须不含 LaTeX 特殊字符（_ % # & { } ~ ^），否则会被转义破坏还原
             placeholder = f"LATEXCMDPLACEHOLDER{placeholder_idx}ENDPLACEHOLDER"

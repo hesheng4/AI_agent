@@ -52,11 +52,16 @@ async def enforce_api_rate_limit(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """对 LLM 生成类端点按用户套餐限流（free=10/分钟 … enterprise=1000/分钟）
+    """对 LLM 生成类端点按用户套餐限流 + 配额强制（free=10/分钟 … enterprise=1000/分钟）
 
     依赖 get_current_user 的结果（同一请求内 FastAPI 会缓存，不会重复鉴权）。
     套餐查询失败不阻塞请求（按 free 档限流），限流本身由
     RATE_LIMIT_API_ENABLED 开关控制。
+
+    配额强制：check_quota 此前只是可查询的数字，从未接入生成端点——
+    用户超套餐后仍可无限调用。此处接入后超额返回 429；无账号行的用户
+    懒创建 free 档（注册流程不建 UserAccount），配额对所有人真实生效。
+    配额检查自身失败不阻塞业务（与套餐查询同语义，宁可漏计不可误杀）。
     """
     if not get_settings().RATE_LIMIT_API_ENABLED:
         return current_user
@@ -75,4 +80,40 @@ async def enforce_api_rate_limit(
         pass
 
     await check_rate_limit_middleware(request, current_user.id, plan)
+
+    try:
+        from app.core.billing import BillingService
+        from app.models.billing import PlanType, UserAccount
+
+        result = await db.execute(
+            select(UserAccount).where(UserAccount.user_id == current_user.id)
+        )
+        account = result.scalar_one_or_none()
+        if account is None:
+            # 懒创建：注册流程不建 UserAccount，无账号直接判 "not found"
+            # 会把全部存量用户挡在门外
+            import uuid as _uuid
+
+            db.add(
+                UserAccount(
+                    id=str(_uuid.uuid4()),
+                    user_id=current_user.id,
+                    plan=PlanType.FREE,
+                    api_calls_used=0,
+                    tokens_used=0,
+                )
+            )
+            await db.commit()
+        quota = await BillingService(db).check_quota(current_user.id)
+        if not quota.get("allowed"):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"套餐配额已用尽（{quota.get('reason', 'quota exceeded')}），"
+                "请升级套餐或等待下月重置",
+            )
+    except HTTPException:
+        raise
+    except Exception:  # noqa: BLE001 — 配额检查失败不阻塞业务
+        pass
+
     return current_user

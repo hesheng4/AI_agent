@@ -26,7 +26,7 @@ class CitationAgent(BaseAgent):
     # 引用类任务属确定性任务，低温保证 JSON 输出稳定与引用结果可复现
     _DETERMINISTIC_TEMPERATURE = 0.0
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="citation",
             tools=["add-citations", "verify-citations", "format-references"],

@@ -62,6 +62,7 @@ export default function Coordinator() {
 
   // 编排 tab — 先连 WS（/ws/tasks/{taskId}）再发编排请求，避免错过 start/planned 事件
   const [orchInput, setOrchInput] = useState('');
+  const [orchSaveArtifact, setOrchSaveArtifact] = useState(false);
   const [orchTaskId, setOrchTaskId] = useState<string | null>(null);
   const [orchResult, setOrchResult] = useState<OrchestrateResponse | null>(null);
   const [orchLoading, setOrchLoading] = useState(false);
@@ -81,7 +82,7 @@ export default function Coordinator() {
 
   async function runOrchestrate(task: string, taskId: string) {
     try {
-      const res = await coordinatorApi.orchestrate(task, '', taskId);
+      const res = await coordinatorApi.orchestrate(task, '', taskId, orchSaveArtifact);
       setOrchResult(res);
     } catch (err) {
       setOrchError(err instanceof Error ? err.message : '编排失败');
@@ -369,6 +370,16 @@ export default function Coordinator() {
                 编排
               </Button>
             </form>
+            <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-ink-bg/60">
+              <input
+                type="checkbox"
+                checked={orchSaveArtifact}
+                onChange={e => setOrchSaveArtifact(e.target.checked)}
+                className="accent-copper"
+              />
+              <i className="fas fa-box-archive text-copper-light" />
+              编排完成后保存结果到「结果存档」（可随时回看与导出）
+            </label>
           </Card>
 
           {orchError && <div className="mb-4"><ErrorBanner message={orchError} /></div>}

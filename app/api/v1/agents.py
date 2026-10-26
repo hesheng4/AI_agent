@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_current_user
+from app.api.deps import enforce_api_rate_limit, get_current_user
 from app.core.agent_generator import confirm_generation, generate_agent
 from app.models.user import User
 
@@ -44,15 +44,24 @@ class ConfirmResponse(BaseModel):
 
 
 @router.post("/generate", response_model=GenerateResponse)
-async def generate(req: GenerateRequest, user: User = Depends(get_current_user)):
-    """LLM 根据自然语言描述生成 Agent 代码骨架（预览，不写入）"""
+async def generate(
+    req: GenerateRequest,
+    user: User = Depends(enforce_api_rate_limit),
+) -> GenerateResponse:
+    """LLM 根据自然语言描述生成 Agent 代码骨架（预览，不写入）
+
+    enforce_api_rate_limit：本端点是 LLM 大段代码生成，原挂 platform 域
+    绕过了套餐限流与配额强制，这里显式补挂（P1 缺口）。
+    """
     result = await generate_agent(req.description, req.name_hint)
     d = result.to_dict()
     return GenerateResponse(**d)
 
 
 @router.post("/confirm", response_model=ConfirmResponse)
-async def confirm(req: ConfirmRequest, user: User = Depends(get_current_user)):
+async def confirm(
+    req: ConfirmRequest, user: User = Depends(get_current_user)
+) -> ConfirmResponse:
     """用户确认后写入正式目录"""
     result = await confirm_generation(req.session_id)
     return ConfirmResponse(**result)

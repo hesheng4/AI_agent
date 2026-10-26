@@ -11,7 +11,7 @@ logger = get_logger("services.citation_network")
 class CitationNetwork:
     """引用网络分析器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.nodes: dict[str, dict[str, Any]] = {}  # paper_id -> node info
         self.edges: list[dict[str, Any]] = []  # citation edges
         self.adjacency: dict[str, set[str]] = defaultdict(
@@ -53,7 +53,7 @@ class CitationNetwork:
         self.adjacency[citing_id].add(cited_id)
         self.reverse_adj[cited_id].add(citing_id)
 
-    def add_citations_batch(self, citations: list[dict[str, str]]) -> None:
+    def add_citations_batch(self, citations: list[dict[str, Any]]) -> None:
         """批量添加引用关系
 
         Args:
@@ -210,7 +210,7 @@ class CitationNetwork:
         edges = []
         visited = set()
 
-        def bfs(current_id: str, current_depth: int):
+        def bfs(current_id: str, current_depth: int) -> None:
             if current_depth > depth or current_id in visited:
                 return
             visited.add(current_id)
@@ -275,7 +275,9 @@ class CitationNetwork:
             "children": [],
         }
 
-        def build_tree(node_id: str, current_depth: int, tree_node: dict):
+        def build_tree(
+            node_id: str, current_depth: int, tree_node: dict[str, Any]
+        ) -> None:
             if current_depth >= max_depth:
                 return
 
@@ -430,7 +432,7 @@ class CitationNetwork:
         lineage = []
         visited = set()
 
-        def trace_back(current_id: str, depth: int):
+        def trace_back(current_id: str, depth: int) -> None:
             if depth >= max_depth or current_id in visited:
                 return
             visited.add(current_id)
@@ -529,7 +531,7 @@ class CitationNetwork:
         diffusion_paths = []
         visited = set()
 
-        def trace_forward(current_id: str, depth: int, path: list[str]):
+        def trace_forward(current_id: str, depth: int, path: list[str]) -> None:
             if depth >= max_depth or current_id in visited:
                 return
             visited.add(current_id)
@@ -679,7 +681,7 @@ class CitationNetwork:
                     continue
 
                 current_comm = community[pid]
-                neighbor_comms = defaultdict(int)
+                neighbor_comms: defaultdict[int, int] = defaultdict(int)
                 for neighbor in undirected_adj[pid]:
                     neighbor_comms[community[neighbor]] += 1
 
@@ -699,11 +701,11 @@ class CitationNetwork:
         # 过滤小聚类
         clusters = {k: v for k, v in clusters.items() if len(v) >= min_cluster_size}
 
-        result_clusters = []
+        result_clusters: list[dict[str, Any]] = []
         for comm_id, members in clusters.items():
             # 提取聚类特征
             titles = [self.nodes.get(pid, {}).get("title", "") for pid in members[:5]]
-            years = [
+            years: list[Any] = [
                 self.nodes.get(pid, {}).get("year")
                 for pid in members
                 if self.nodes.get(pid, {}).get("year")
@@ -742,13 +744,13 @@ class CitationNetwork:
         # 使用union-find
         parent = {pid: pid for pid in self.nodes}
 
-        def find(x):
+        def find(x: str) -> str:
             while parent[x] != x:
                 parent[x] = parent[parent[x]]
                 x = parent[x]
             return x
 
-        def union(x, y):
+        def union(x: str, y: str) -> None:
             px, py = find(x), find(y)
             if px != py:
                 parent[px] = py
@@ -765,7 +767,7 @@ class CitationNetwork:
 
         clusters = {k: v for k, v in clusters.items() if len(v) >= min_cluster_size}
 
-        result = []
+        result: list[dict[str, Any]] = []
         for i, (root, members) in enumerate(clusters.items()):
             result.append(
                 {
@@ -837,7 +839,9 @@ class CitationNetwork:
 
         return round(q / (2 * m), 6)
 
-    def _extract_evolution_themes(self, lineage: list[dict]) -> list[str]:
+    def _extract_evolution_themes(
+        self, lineage: list[dict[str, Any]]
+    ) -> list[str]:
         """从研究脉络中提取演化主题"""
         themes = []
         for step in lineage:
@@ -853,13 +857,13 @@ class CitationNetwork:
                     themes.append(top_word)
         return themes
 
-    def _detect_clusters(self, papers: list[dict]) -> list[dict]:
+    def _detect_clusters(self, papers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """简单主题聚类检测"""
         if not papers:
             return []
 
         # 按期刊分组
-        journal_groups: dict[str, list[dict]] = defaultdict(list)
+        journal_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for p in papers:
             journal = p.get("journal", "unknown")
             journal_groups[journal].append(p)

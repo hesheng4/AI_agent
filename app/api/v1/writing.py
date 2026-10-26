@@ -15,7 +15,7 @@ router = APIRouter()
 settings = get_settings()
 
 
-def _user_llm_config(user: User) -> dict:
+def _user_llm_config(user: User) -> dict[str, Any]:
     """从用户模型提取 LLM 配置，优先用户级 > 系统级"""
     api_key = user.api_key or settings.OPENAI_API_KEY
     base_url = user.api_base_url or settings.OPENAI_BASE_URL
@@ -27,7 +27,7 @@ def _user_llm_config(user: User) -> dict:
     }
 
 
-def _require_api_key(api_key: str | None):
+def _require_api_key(api_key: str | None) -> None:
     """当系统级和用户级 API key 都为空时，返回 400 提示配置"""
     if not api_key:
         raise HTTPException(
@@ -195,7 +195,7 @@ class DetectTypeResponse(BaseModel):
 @router.post("/outline", response_model=OutlineResponse)
 async def create_outline(
     request: OutlineRequest, current_user: User = Depends(get_current_user)
-):
+) -> OutlineResponse:
     """生成论文大纲（Nature-skills 论文类型分类学驱动）"""
     llm_config = _user_llm_config(current_user)
     _require_api_key(llm_config["_user_api_key"])
@@ -227,7 +227,7 @@ async def create_outline(
 @router.post("/generate", response_model=GenerateResponse)
 async def generate_content(
     request: GenerateRequest, current_user: User = Depends(get_current_user)
-):
+) -> GenerateResponse:
     """生成章节内容（遵循论证链和术语账本）"""
     llm_config = _user_llm_config(current_user)
     _require_api_key(llm_config["_user_api_key"])
@@ -256,7 +256,7 @@ async def generate_content(
 @router.post("/polish", response_model=PolishResponse)
 async def polish_text(
     request: PolishRequest, current_user: User = Depends(get_current_user)
-):
+) -> PolishResponse:
     """AI润色文本（服务读者工作流，不改变论证结构）"""
     llm_config = _user_llm_config(current_user)
     _require_api_key(llm_config["_user_api_key"])
@@ -283,7 +283,7 @@ async def polish_text(
 @router.post("/check", response_model=CheckResponse)
 async def check_grammar(
     request: CheckRequest, current_user: User = Depends(get_current_user)
-):
+) -> CheckResponse:
     """语法检查（含裸论断检测）"""
     logger.info(f"用户 {current_user.id} 检查语法")
 
@@ -296,7 +296,7 @@ async def check_grammar(
 @router.post("/word-count", response_model=WordCountResponse)
 async def count_words(
     request: CheckRequest, current_user: User = Depends(get_current_user)
-):
+) -> WordCountResponse:
     """字数统计"""
     logger.info(f"用户 {current_user.id} 统计字数")
 
@@ -309,7 +309,7 @@ async def count_words(
 @router.post("/structure", response_model=StructureResponse)
 async def analyze_structure(
     request: StructureRequest, current_user: User = Depends(get_current_user)
-):
+) -> StructureResponse:
     """分析论文论证结构（Nature-skills 读者工作流驱动）"""
     llm_config = _user_llm_config(current_user)
     _require_api_key(llm_config["_user_api_key"])
@@ -337,7 +337,7 @@ async def analyze_structure(
 @router.post("/terminology", response_model=TerminologyResponse)
 async def build_terminology(
     request: TerminologyRequest, current_user: User = Depends(get_current_user)
-):
+) -> TerminologyResponse:
     """构建术语账本（Nature-skills 术语一致性规则）"""
     llm_config = _user_llm_config(current_user)
     _require_api_key(llm_config["_user_api_key"])
@@ -363,7 +363,7 @@ async def build_terminology(
 @router.post("/evidence", response_model=EvidenceResponse)
 async def analyze_evidence(
     request: EvidenceRequest, current_user: User = Depends(get_current_user)
-):
+) -> EvidenceResponse:
     """分析证据链完整性（裸论断检测）"""
     llm_config = _user_llm_config(current_user)
     _require_api_key(llm_config["_user_api_key"])
@@ -389,7 +389,7 @@ async def analyze_evidence(
 @router.post("/detect-type", response_model=DetectTypeResponse)
 async def detect_paper_type(
     request: DetectTypeRequest, current_user: User = Depends(get_current_user)
-):
+) -> DetectTypeResponse:
     """检测论文类型"""
     logger.info(f"用户 {current_user.id} 检测论文类型")
 
@@ -429,7 +429,7 @@ class LaTeXExportRequest(BaseModel):
 @router.post("/export-latex")
 async def export_latex(
     request: LaTeXExportRequest, current_user: User = Depends(get_current_user)
-):
+) -> Response:
     """导出论文为 LaTeX 源码"""
     logger.info(f"用户 {current_user.id} 导出 LaTeX, 标题={request.title}")
 

@@ -1,5 +1,7 @@
 """Nature-Paper2PPT API: 论文→PPTX"""
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -31,7 +33,7 @@ class Paper2PPTRequest(BaseModel):
 @router.post("/generate")
 async def generate_ppt(
     request: Paper2PPTRequest, current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     """论文→Nature风格中文PPTX"""
     from app.agents.paper2ppt.agent import Paper2PPTAgent
 

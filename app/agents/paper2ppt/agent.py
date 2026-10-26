@@ -119,7 +119,7 @@ PAPER_TYPE_ARCS = {
 class Paper2PPTAgent(BaseAgent):
     """论文→PPTX Agent"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="paper2ppt",
             tools=["classify", "extract", "terminology", "outline", "content", "qa"],
@@ -226,7 +226,9 @@ class Paper2PPTAgent(BaseAgent):
             issues.append("生成内容过短，可能不完整")
         return {"passed": len(issues) == 0, "issues": issues}
 
-    async def generate_pptx(self, deck: dict, output_path: str = "output.pptx") -> str:
+    async def generate_pptx(
+        self, deck: dict[str, Any], output_path: str = "output.pptx"
+    ) -> str:
         """Step 9: 实际生成 .pptx 文件"""
         try:
             from pptx import Presentation
@@ -259,7 +261,7 @@ class Paper2PPTAgent(BaseAgent):
         "9_export_pptx",
     ]
 
-    async def full_9_step(self, request: dict) -> dict:
+    async def full_9_step(self, request: dict[str, Any]) -> dict[str, Any]:
         """完整9步工作流"""
         content = request.get("content", "")
         paper_type = request.get("paper_type", "auto")
@@ -281,7 +283,9 @@ class Paper2PPTAgent(BaseAgent):
         pptx_path = await self.generate_pptx(deck)
         return {"deck": deck, "pptx_path": pptx_path, "qa": qa}
 
-    async def _fix_deck(self, deck: dict, issues: list) -> dict:
+    async def _fix_deck(
+        self, deck: dict[str, Any], issues: list[str]
+    ) -> dict[str, Any]:
         """修正幻灯片问题"""
         fix_prompt = (
             f"修正以下PPT问题：{issues}\n\n原内容：{deck.get('content', '')[:2000]}"

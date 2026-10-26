@@ -14,6 +14,7 @@ import logging
 import os
 import re
 import sqlite3
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -355,7 +356,7 @@ def search_history(
     return hits[:max_hits]
 
 
-def _rglob_with_depth(path: Path, pattern: str, max_depth: int):
+def _rglob_with_depth(path: Path, pattern: str, max_depth: int) -> Iterator[Path]:
     """带深度限制的 rglob，避免遍历巨大目录树"""
     base_depth = len(path.parts)
     for p in path.rglob(pattern):
@@ -377,7 +378,7 @@ def _search_in_path(
     # 搜索最大深度（层数），防止遍历巨大目录
     MAX_SEARCH_DEPTH = 8  # noqa: N806
 
-    hits = []
+    hits: list[HistoryHit] = []
     root_path = Path(root)
 
     if not root_path.exists():
@@ -498,7 +499,7 @@ def _search_text_file(
     exclude_terms: list[str] | None,
 ) -> list[HistoryHit]:
     """搜索文本文件 (JSON, JSONL, MD, TXT)"""
-    hits = []
+    hits: list[HistoryHit] = []
     try:
         with open(file_path, encoding="utf-8", errors="replace") as f:
             content = f.read(100000)  # 限制读取量
@@ -728,7 +729,7 @@ def extract_skill_material(
     return material
 
 
-def _extract_env_info(material: SkillMaterial, content: str):
+def _extract_env_info(material: SkillMaterial, content: str) -> None:
     """提取环境信息"""
     # Python 版本
     py_match = re.search(r"python[=><!~]+(\d+\.\d+[\.\d]*)", content, re.IGNORECASE)
@@ -773,7 +774,7 @@ def _extract_env_info(material: SkillMaterial, content: str):
             material.entry_scripts.append(script)
 
 
-def _extract_adapt_steps(material: SkillMaterial, content: str):
+def _extract_adapt_steps(material: SkillMaterial, content: str) -> None:
     """提取适配步骤"""
     # CUDA 替换
     cuda_patterns = [
@@ -810,7 +811,7 @@ def _extract_adapt_steps(material: SkillMaterial, content: str):
                 )
 
 
-def _extract_optimize_steps(material: SkillMaterial, content: str):
+def _extract_optimize_steps(material: SkillMaterial, content: str) -> None:
     """提取优化步骤"""
     # 运行时环境变量
     env_var_patterns = [
@@ -846,7 +847,7 @@ def _extract_optimize_steps(material: SkillMaterial, content: str):
             )
 
 
-def _extract_verify_commands(material: SkillMaterial, content: str):
+def _extract_verify_commands(material: SkillMaterial, content: str) -> None:
     """提取验证命令"""
     # 查找 python / bash 验证命令
     verify_matches = re.findall(
@@ -868,7 +869,7 @@ def _extract_verify_commands(material: SkillMaterial, content: str):
                 material.verify_commands.append(clean_cmd)
 
 
-def _extract_common_issues(material: SkillMaterial, content: str):
+def _extract_common_issues(material: SkillMaterial, content: str) -> None:
     """提取常见问题"""
     # 查找错误和修复
     error_matches = re.findall(

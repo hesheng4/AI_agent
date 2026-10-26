@@ -268,6 +268,8 @@ def test_audit_all_singleton_factories_idempotent():
         b = factory()
         if a is not b:
             failures.append(f"{name}: {factory_name}() returned distinct instances")
-        # Clear lru_cache so other tests get fresh state.
-        factory.cache_clear()
+        # 注意：不得调用 factory.cache_clear()。路由模块在 import 期已捕获
+        # get_coordinator_agent() 的单例（app.api.v1.coordinator._agent），
+        # 中途清缓存会让后续测试取到与路由不同的实例 → HTTP 打桩全部落空
+        # （全量运行时 e2e workflow_chain 假失败的根因）。热缓存即生产常态。
     assert not failures, "Singleton failures:\n" + "\n".join(failures)

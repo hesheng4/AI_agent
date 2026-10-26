@@ -265,7 +265,7 @@ class FigureTools:
 class FigureAgent:
     """论文级图表 Agent（独立于 BaseAgent，不依赖 LLM）"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.tools = FigureTools()
         self.logger = get_logger("agent.figure")
 
@@ -310,7 +310,7 @@ class FigureAgent:
 
     @staticmethod
     def export_to_file(
-        fig, output_path: str, format: str = "pdf", dpi: int = 300
+        fig: Any, output_path: str, format: str = "pdf", dpi: int = 300
     ) -> str:
         """将 matplotlib Figure 导出为期刊级文件"""
         try:
@@ -332,7 +332,7 @@ class FigureAgent:
             return f"导出失败: {e}"
 
     @staticmethod
-    def create_nature_figure(contract: dict, data: dict) -> Any:
+    def create_nature_figure(contract: dict[str, Any], data: dict[str, Any]) -> Any:
         """按 Figure Contract 创建 Nature 风格图表"""
         import matplotlib.pyplot as plt
 

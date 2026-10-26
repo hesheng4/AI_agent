@@ -14,6 +14,7 @@ import os
 import re
 import shlex
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -815,7 +816,7 @@ class ValidationExecutor:
             model_name=config.model_name,
             hardware_type=config.hardware_type,
         )
-        self._server_process = None
+        self._server_process: subprocess.Popen[bytes] | None = None
 
     def run(self) -> ValidationReport:
         """执行完整验证流水线"""
@@ -882,14 +883,14 @@ class ValidationExecutor:
 
         return self._finalize(start_time)
 
-    def _log(self, msg: str):
+    def _log(self, msg: str) -> None:
         """记录日志"""
         timestamp = datetime.now().strftime("%H:%M:%S")
         log_line = f"[{timestamp}] {msg}"
         self.report.logs.append(log_line)
         logger.info(log_line)
 
-    def _fail(self, reason: str):
+    def _fail(self, reason: str) -> None:
         """标记失败"""
         self.report.success = False
         self.report.errors.append(reason)
@@ -971,7 +972,7 @@ class ValidationExecutor:
             return False
 
     # --- Step 3.1: 精度验证 ---
-    def _step_accuracy(self):
+    def _step_accuracy(self) -> None:
         sc = self.config.vllm_server
         model_id = sc.served_model_name or self.config.model_name
 
@@ -1006,7 +1007,7 @@ class ValidationExecutor:
             )
 
     # --- Step 3.2: 性能基准测试 ---
-    def _step_performance(self):
+    def _step_performance(self) -> None:
         for mode in self.config.run_performance_tests:
             self._log(f"执行性能测试: {mode}")
 
@@ -1035,37 +1036,49 @@ class ValidationExecutor:
             self._log(f"性能测试 {mode} 完成: status={result.status.value}")
 
     # --- Step 4: 资源清理 ---
-    def _step_cleanup(self):
+    def _step_cleanup(self) -> None:
         # 停止 vLLM 服务进程（按进程组终止，避免孤儿子进程）
         if self._server_process:
-            try:
-                import signal as _signal
-
-                # 优先向整个进程组发送 SIGTERM
+            if sys.platform == "win32":
+                # Windows 无进程组语义（getpgid/killpg 为 POSIX-only）
+                self._server_process.terminate()
                 try:
-                    os.killpg(os.getpgid(self._server_process.pid), _signal.SIGTERM)
-                except (ProcessLookupError, PermissionError):
-                    self._server_process.terminate()
-                self._server_process.wait(timeout=30)
+                    self._server_process.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    self._server_process.kill()
                 self._log("vLLM 服务已停止")
-            except Exception:
+            else:
                 try:
                     import signal as _signal
 
+                    # 优先向整个进程组发送 SIGTERM
                     try:
-                        os.killpg(os.getpgid(self._server_process.pid), _signal.SIGKILL)
+                        os.killpg(os.getpgid(self._server_process.pid), _signal.SIGTERM)
                     except (ProcessLookupError, PermissionError):
-                        self._server_process.kill()
-                    self._log("vLLM 服务已强制终止")
+                        self._server_process.terminate()
+                    self._server_process.wait(timeout=30)
+                    self._log("vLLM 服务已停止")
                 except Exception:
-                    pass
+                    try:
+                        import signal as _signal
+
+                        try:
+                            os.killpg(
+                                os.getpgid(self._server_process.pid),
+                                _signal.SIGKILL,
+                            )
+                        except (ProcessLookupError, PermissionError):
+                            self._server_process.kill()
+                        self._log("vLLM 服务已强制终止")
+                    except Exception:
+                        pass
 
         # 额外清理残留进程
         _kill_vllm_server()
         self._log("资源清理完成")
 
     # --- Step 5: 报告生成 ---
-    def _step_generate_report(self):
+    def _step_generate_report(self) -> None:
         report_dir = Path(self.config.report_output_dir)
         report_dir.mkdir(parents=True, exist_ok=True)
 

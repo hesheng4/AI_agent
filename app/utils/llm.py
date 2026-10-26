@@ -1,6 +1,8 @@
 import asyncio
 import hashlib
+from collections import OrderedDict
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Any
 
 from openai import APIError, APITimeoutError, AsyncOpenAI, RateLimitError
 
@@ -13,6 +15,9 @@ from app.utils.exceptions import (
 )
 from app.utils.logger import get_logger
 
+if TYPE_CHECKING:
+    from app.core.ascend import VLLMAscendClient
+
 logger = get_logger("llm")
 settings = get_settings()
 
@@ -22,11 +27,27 @@ RETRY_DELAY = 1.0  # 秒
 RETRY_BACKOFF = 2.0  # 指数退避倍数
 
 # LLM 客户端复用缓存：避免每次请求新建 AsyncOpenAI 实例（httpx 连接池复用）
-# 键为 (api_key_hash, base_url) 元组，避免明文密钥长期驻留内存
-_user_client_cache: dict[tuple[str, str], AsyncOpenAI] = {}
+# 键为 (api_key_hash, base_url) 元组，避免明文密钥长期驻留内存。
+# OrderedDict：LRU 逐出需要 move_to_end（普通 dict 无此方法）。
+_user_client_cache: OrderedDict[tuple[str, str], AsyncOpenAI] = OrderedDict()
 _USER_CLIENT_CACHE_MAX = 100
 # 缓存读写锁，防止并发清空导致使用中的客户端被销毁
 _client_cache_lock = asyncio.Lock()
+
+
+def _aclose_client_quietly(client: AsyncOpenAI) -> None:
+    """后台关闭被逐出的客户端连接池；无事件循环时交给 GC。"""
+
+    async def _close() -> None:
+        try:
+            await client.close()
+        except Exception:  # noqa: BLE001 — 逐出关闭失败不影响业务
+            pass
+
+    try:
+        asyncio.get_running_loop().create_task(_close())
+    except RuntimeError:
+        pass
 
 
 class LLMClient:
@@ -39,10 +60,10 @@ class LLMClient:
     支持用户级 API 配置覆盖（api_key, api_base_url, api_model）。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._mode = settings.LLM_MODE
-        self._remote_client = None
-        self._ascend_client = None
+        self._remote_client: AsyncOpenAI | None = None
+        self._ascend_client: VLLMAscendClient | None = None
         self.model = self._get_model_name()
 
     def _get_model_name(self) -> str:
@@ -51,7 +72,9 @@ class LLMClient:
             return settings.ASCEND_LLM_MODEL
         return settings.OPENAI_MODEL
 
-    def _get_remote_client(self, user_api_key=None, user_base_url=None) -> AsyncOpenAI:
+    def _get_remote_client(
+        self, user_api_key: str | None = None, user_base_url: str | None = None
+    ) -> AsyncOpenAI:
         """懒初始化远程 OpenAI 客户端，支持用户级覆盖
 
         用户级配置时复用同 (api_key_hash, base_url) 的客户端实例，
@@ -64,14 +87,20 @@ class LLMClient:
             cache_key = (api_key_hash, user_base_url)
             client = _user_client_cache.get(cache_key)
             if client is None:
-                # 容量满时通过锁保护清空，避免与并发读取竞态
-                if len(_user_client_cache) >= _USER_CLIENT_CACHE_MAX:
-                    logger.info("用户级 LLM 客户端缓存已满，清空重建")
-                    _user_client_cache.clear()
+                # 容量满时 LRU 逐出最旧条目并显式关闭其连接池。
+                # 旧实现整体 clear() 且不 close：被清出的 AsyncOpenAI
+                # httpx 连接池既不释放又造成抖动；dict 操作在单事件循环内
+                # 天然原子，无需加锁。
+                while len(_user_client_cache) >= _USER_CLIENT_CACHE_MAX:
+                    oldest_key, oldest = next(iter(_user_client_cache.items()))
+                    _user_client_cache.pop(oldest_key)
+                    _aclose_client_quietly(oldest)
                 client = AsyncOpenAI(
                     api_key=user_api_key, base_url=user_base_url, timeout=60.0
                 )
                 _user_client_cache[cache_key] = client
+            else:
+                _user_client_cache.move_to_end(cache_key)  # LRU 命中刷新
             return client
         if self._remote_client is None:
             self._remote_client = AsyncOpenAI(
@@ -81,7 +110,7 @@ class LLMClient:
             )
         return self._remote_client
 
-    def _get_ascend_client(self):
+    def _get_ascend_client(self) -> VLLMAscendClient:
         """懒初始化 vLLM-Ascend 客户端"""
         if self._ascend_client is None:
             from app.core.ascend import get_vllm_client
@@ -229,7 +258,7 @@ class LLMClient:
         """
 
         effective_model = user_api_model or self.model
-        messages: list[dict[str, str]] = []
+        messages: list[Any] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
@@ -298,7 +327,7 @@ class LLMClient:
 
     async def _call_with_retry(
         self,
-        messages: list[dict[str, str]],
+        messages: list[Any],
         temperature: float,
         max_tokens: int | None,
         user_api_key: str | None = None,
@@ -309,7 +338,7 @@ class LLMClient:
 
         返回 (text, usage)
         """
-        last_exception = None
+        last_exception: APIError | None = None
         effective_model = user_api_model or self.model
 
         for attempt in range(MAX_RETRIES):

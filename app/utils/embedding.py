@@ -1,4 +1,5 @@
 import asyncio
+from typing import TYPE_CHECKING
 
 from openai import APIError, APITimeoutError, AsyncOpenAI, RateLimitError
 
@@ -6,6 +7,9 @@ from app.config import get_settings
 from app.core.cache import cache
 from app.utils.exceptions import AppException
 from app.utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from app.core.ascend import NPULocalEmbedding, VLLMAscendClient
 
 logger = get_logger("embedding")
 settings = get_settings()
@@ -35,11 +39,11 @@ class EmbeddingClient:
     - "ascend_local": 使用 torch_npu 本地推理（sentence-transformers）
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._mode = settings.EMBEDDING_MODE
-        self._remote_client = None
-        self._ascend_client = None
-        self._npu_local = None
+        self._remote_client: AsyncOpenAI | None = None
+        self._ascend_client: VLLMAscendClient | None = None
+        self._npu_local: NPULocalEmbedding | None = None
         self.model = self._get_model_name()
 
     def _get_model_name(self) -> str:
@@ -60,7 +64,7 @@ class EmbeddingClient:
             )
         return self._remote_client
 
-    def _get_ascend_client(self):
+    def _get_ascend_client(self) -> VLLMAscendClient:
         """懒初始化 vLLM-Ascend 客户端"""
         if self._ascend_client is None:
             from app.core.ascend import get_vllm_client
@@ -68,7 +72,7 @@ class EmbeddingClient:
             self._ascend_client = get_vllm_client()
         return self._ascend_client
 
-    def _get_npu_local(self):
+    def _get_npu_local(self) -> NPULocalEmbedding | None:
         """懒初始化 NPU 本地 Embedding"""
         if self._npu_local is None:
             from app.core.ascend import get_npu_embedding
@@ -123,7 +127,7 @@ class EmbeddingClient:
 
     async def _embed_remote(self, texts: list[str]) -> list[list[float]]:
         """远程 Embedding API（带重试）"""
-        last_exception = None
+        last_exception: APIError | None = None
         for attempt in range(MAX_RETRIES):
             try:
                 client = self._get_remote_client()

@@ -89,7 +89,7 @@ class FormatReferencesResponse(BaseModel):
 @router.post("/add", response_model=AddCitationsResponse)
 async def add_citations(
     request: AddCitationsRequest, current_user: User = Depends(get_current_user)
-):
+) -> AddCitationsResponse:
     """为文本添加引用"""
     logger.info(f"用户 {current_user.id} 添加引用: 期刊范围={request.journal_scope}")
 
@@ -115,7 +115,7 @@ async def add_citations(
 @router.post("/verify", response_model=VerifyCitationsResponse)
 async def verify_citations(
     request: VerifyCitationsRequest, current_user: User = Depends(get_current_user)
-):
+) -> VerifyCitationsResponse:
     """验证引用匹配度"""
     logger.info(f"用户 {current_user.id} 验证引用")
 
@@ -141,7 +141,7 @@ async def verify_citations(
 @router.post("/format", response_model=FormatReferencesResponse)
 async def format_references(
     request: FormatReferencesRequest, current_user: User = Depends(get_current_user)
-):
+) -> FormatReferencesResponse:
     """格式化参考文献"""
     logger.info(f"用户 {current_user.id} 格式化引用: 风格={request.style}")
 

@@ -25,7 +25,7 @@ from app.utils.exceptions import AgentException
 class PolishingAgent(BaseAgent):
     """Nature-skills 驱动的学术润色 Agent"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="polishing",
             tools=[

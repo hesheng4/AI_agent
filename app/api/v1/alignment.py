@@ -1,6 +1,7 @@
 """精度对齐 API - 触发对比、查看结果、生成报告"""
 
 import json
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
@@ -31,7 +32,7 @@ class AlignmentStatus(BaseModel):
     """精度对齐状态"""
 
     running: bool = False
-    last_result: dict | None = None
+    last_result: dict[str, Any] | None = None
     error: str | None = None
 
 
@@ -40,13 +41,15 @@ _alignment_status = AlignmentStatus()
 
 
 @router.get("/status")
-async def alignment_status():
+async def alignment_status() -> dict[str, Any]:
     """获取当前精度对齐状态"""
     return _alignment_status.dict()
 
 
 @router.post("/run")
-async def run_alignment(request: AlignmentRequest, background_tasks: BackgroundTasks):
+async def run_alignment(
+    request: AlignmentRequest, background_tasks: BackgroundTasks
+) -> dict[str, Any]:
     """触发精度对齐（后台执行）"""
     if _alignment_status.running:
         raise HTTPException(status_code=409, detail="精度对齐正在运行中，请等待完成")
@@ -59,7 +62,7 @@ async def run_alignment(request: AlignmentRequest, background_tasks: BackgroundT
     return {"message": "精度对齐已启动", "baseline_source": request.baseline_source}
 
 
-async def _execute_alignment(request: AlignmentRequest):
+async def _execute_alignment(request: AlignmentRequest) -> None:
     """执行精度对齐（后台任务）"""
     try:
         import os
@@ -161,7 +164,7 @@ async def _execute_alignment(request: AlignmentRequest):
 
 
 @router.get("/report")
-async def get_latest_report():
+async def get_latest_report() -> dict[str, Any]:
     """获取最新的精度对齐报告"""
     import glob
 
@@ -171,11 +174,12 @@ async def get_latest_report():
 
     latest = reports[-1]
     with open(latest, encoding="utf-8") as f:
-        return json.load(f)
+        report_data: dict[str, Any] = json.load(f)
+        return report_data
 
 
 @router.get("/thresholds")
-async def get_thresholds():
+async def get_thresholds() -> dict[str, Any]:
     """获取当前精度对齐阈值（预声明）"""
     from app.core.alignment import DEFAULT_THRESHOLDS
 
@@ -183,7 +187,7 @@ async def get_thresholds():
 
 
 @router.get("/constraints")
-async def get_default_constraints():
+async def get_default_constraints() -> dict[str, Any]:
     """获取默认对比约束"""
     from app.core.alignment import BGE_LARGE_ZH_CONSTRAINTS, QWEN25_72B_CONSTRAINTS
 

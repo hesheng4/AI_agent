@@ -83,7 +83,7 @@ class AgentGenerationResult:
         self.api_route_py: str = data.get("api_route_py", "")
         self.frontend_page_tsx: str = data.get("frontend_page_tsx", "")
         self.frontend_api_ts: str = data.get("frontend_api_ts", "")
-        self.planner_entry: dict = data.get("planner_entry", {})
+        self.planner_entry: dict[str, Any] = data.get("planner_entry", {})
         self._temp_dir = temp_dir
 
     def to_dict(self) -> dict[str, Any]:
@@ -225,7 +225,7 @@ async def confirm_generation(session_id: str) -> dict[str, Any]:
     }
 
 
-def _extract_json(raw: str) -> dict | None:
+def _extract_json(raw: str) -> dict[str, Any] | None:
     """从 LLM 输出中提取 JSON（处理 ```json 包裹）"""
     # 尝试直接解析
     try:
@@ -285,7 +285,7 @@ def _append_router_include(agent_name: str) -> None:
     init_file.write_text(content, encoding="utf-8")
 
 
-def _append_planner_entry(agent_name: str, entry: dict) -> None:
+def _append_planner_entry(agent_name: str, entry: dict[str, Any]) -> None:
     """在 planner.py 追加关键词 + 能力地图条目（幂等）"""
     planner_file = Path("app/agents/coordinator/planner.py")
     content = planner_file.read_text(encoding="utf-8")

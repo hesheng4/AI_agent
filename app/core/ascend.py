@@ -38,7 +38,7 @@ class AscendNPUManager:
     @classmethod
     def check_environment(cls) -> dict[str, Any]:
         """检测昇腾 NPU 环境"""
-        result = {
+        result: dict[str, Any] = {
             "torch_npu_installed": False,
             "npu_available": False,
             "device_count": 0,
@@ -100,7 +100,7 @@ class AscendNPUManager:
         return cls._device_count
 
     @classmethod
-    def set_visible_devices(cls, device_ids: list[int]):
+    def set_visible_devices(cls, device_ids: list[int]) -> None:
         """设置可见 NPU 设备（校验 ID 有效性）"""
         if not device_ids:
             raise ValueError("device_ids 不能为空")
@@ -153,10 +153,10 @@ class VLLMAscendClient:
         self.model = model
         self._api_key = api_key
         self._timeout = timeout
-        self._client = None
+        self._client: Any = None
         self._client_lock = asyncio.Lock()
 
-    async def _ensure_client(self):
+    async def _ensure_client(self) -> Any:
         """懒初始化 httpx 客户端（带并发保护）"""
         if self._client is None:
             async with self._client_lock:
@@ -176,7 +176,7 @@ class VLLMAscendClient:
         messages: list[dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """调用 vLLM-Ascend 的 Chat Completions API
 
@@ -195,7 +195,7 @@ class VLLMAscendClient:
         messages: list[dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> tuple[str, dict[str, int]]:
         """调用 vLLM-Ascend 的 Chat Completions API，返回 (text, usage)
 
@@ -275,12 +275,12 @@ class VLLMAscendClient:
         """检查 vLLM-Ascend 服务是否就绪"""
         client = await self._ensure_client()
         try:
-            response = await client.get("/models")
+            response: httpx.Response = await client.get("/models")
             return response.status_code == 200
         except Exception:
             return False
 
-    async def close(self):
+    async def close(self) -> None:
         """关闭客户端"""
         if self._client is not None:
             await self._client.aclose()
@@ -299,16 +299,16 @@ class NPULocalEmbedding:
     ):
         self.model_name = model_name
         self.device = device
-        self._model = None
+        self._model: Any = None
         self._tokenizer = None
 
-    async def _load_model_async(self):
+    async def _load_model_async(self) -> None:
         """异步加载模型到 NPU（在线程池中执行，避免阻塞事件循环）"""
         if self._model is not None:
             return
         await asyncio.to_thread(self._load_model_sync)
 
-    def _load_model_sync(self):
+    def _load_model_sync(self) -> None:
         """同步加载模型（阻塞调用，应通过 _load_model_async 调用）"""
         if self._model is not None:
             return
@@ -362,7 +362,7 @@ class NPULocalEmbedding:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.encode, texts)
 
-    async def close(self):
+    async def close(self) -> None:
         """释放模型资源（含 NPU 显存回收）"""
         if self._model is not None:
             try:

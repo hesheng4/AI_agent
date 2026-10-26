@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -43,7 +45,7 @@ class ReviewLoopRequest(BaseModel):
 class ReviewLoopRound(BaseModel):
     round: int
     score: float | None
-    axes: dict = Field(default_factory=dict)
+    axes: dict[str, Any] = Field(default_factory=dict)
     suggestion_count: int = 0
     change_summary: str = ""
 
@@ -67,7 +69,7 @@ class ReviewLoopResponse(BaseModel):
 @router.post("/run", response_model=ReviewLoopResponse)
 async def run_review_loop(
     request: ReviewLoopRequest, current_user: User = Depends(get_current_user)
-):
+) -> ReviewLoopResponse:
     """审稿→修改→再审稿自动迭代闭环（H1，AI-Scientist 借鉴）"""
     logger.info(
         f"用户 {current_user.id} 启动审稿迭代: 类型={request.paper_type}, "

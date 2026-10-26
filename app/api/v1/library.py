@@ -131,7 +131,7 @@ async def add_paper(
     request: PaperAddRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> PaperResponse:
     """添加文献到收藏"""
     try:
         data = await library_service.papers.add_paper(
@@ -164,7 +164,7 @@ async def list_papers(
     offset: int = Query(default=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> list[PaperResponse]:
     """获取收藏文献列表"""
     items = await library_service.papers.list_papers(
         db,
@@ -184,7 +184,7 @@ async def get_paper(
     paper_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> PaperResponse:
     """获取单个收藏文献 - paper_id 可以是数据库ID或外部paper_id"""
     try:
         data = await library_service.papers.get_paper(db, current_user.id, paper_id)
@@ -199,7 +199,7 @@ async def update_paper(
     request: PaperUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> PaperResponse:
     """更新收藏文献 - paper_id 可以是数据库ID或外部paper_id"""
     try:
         data = await library_service.papers.update_paper(
@@ -222,7 +222,7 @@ async def delete_paper(
     paper_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, str]:
     """删除收藏文献 - paper_id 可以是数据库ID或外部paper_id"""
     try:
         await library_service.papers.delete_paper(db, current_user.id, paper_id)
@@ -239,7 +239,7 @@ async def create_category(
     request: CategoryCreateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> CategoryResponse:
     """创建分类"""
     data = await library_service.categories.create_category(
         db,
@@ -255,7 +255,7 @@ async def create_category(
 @router.get("/categories", response_model=list[CategoryResponse])
 async def list_categories(
     current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
-):
+) -> list[CategoryResponse]:
     """获取分类列表"""
     items = await library_service.categories.list_categories(db, current_user.id)
     return [CategoryResponse(**d) for d in items]
@@ -266,7 +266,7 @@ async def delete_category(
     category_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, str]:
     """删除分类（该分类下 papers 自动改为 uncategorized）"""
     try:
         await library_service.categories.delete_category(
@@ -285,7 +285,7 @@ async def create_tag(
     request: TagCreateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> TagResponse:
     """创建标签"""
     data = await library_service.tags.create_tag(
         db, current_user.id, name=request.name, color=request.color
@@ -296,7 +296,7 @@ async def create_tag(
 @router.get("/tags", response_model=list[TagResponse])
 async def list_tags(
     current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
-):
+) -> list[TagResponse]:
     """获取标签列表"""
     items = await library_service.tags.list_tags(db, current_user.id)
     return [TagResponse(**d) for d in items]
@@ -307,7 +307,7 @@ async def delete_tag(
     tag_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, str]:
     """删除标签（自动从所有 papers 的 tags 列表移除）"""
     try:
         await library_service.tags.delete_tag(db, current_user.id, tag_id)
@@ -322,7 +322,7 @@ async def delete_tag(
 @router.get("/stats", response_model=LibraryStatsResponse)
 async def get_library_stats(
     current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
-):
+) -> LibraryStatsResponse:
     """获取文献库统计"""
     data = await library_service.stats.get_stats(db, current_user.id)
     return LibraryStatsResponse(**data)
@@ -380,7 +380,7 @@ async def add_citation(
     request: CitationAddRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> CitationResponse:
     """添加引用关系（自动回填 citing/cited_title）"""
     try:
         data = await library_service.citations.add_citation(
@@ -403,7 +403,7 @@ async def add_citations_batch(
     request: CitationBatchRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """批量添加引用关系"""
     citations = [c.model_dump() for c in request.citations]
     return await library_service.citations.add_citations_batch(
@@ -419,7 +419,7 @@ async def list_citations(
     offset: int = Query(default=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> list[CitationResponse]:
     """获取引用关系列表"""
     items = await library_service.citations.list_citations(
         db,
@@ -437,7 +437,7 @@ async def delete_citation(
     citation_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, str]:
     """删除引用关系"""
     try:
         await library_service.citations.delete_citation(
@@ -453,7 +453,7 @@ async def get_citation_graph(
     request: CitationGraphRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> NetworkGraphResponse:
     """获取引用网络图"""
     data = await library_service.citations.get_graph(
         db, current_user.id, request.paper_id, request.depth
@@ -466,7 +466,7 @@ async def co_citation_analysis(
     request: CoCitationRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """共被引分析"""
     return await library_service.citations.co_citation(
         db,
@@ -481,7 +481,7 @@ async def get_influential_papers(
     top_k: int = Query(default=10, ge=1, le=50),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """获取高影响力论文（基于PageRank）"""
     return await library_service.citations.influential_papers(
         db, current_user.id, top_k
@@ -494,7 +494,7 @@ async def get_research_lineage(
     max_depth: int = Query(default=5, ge=1, le=10),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """获取研究脉络（追溯学术传承）"""
     return await library_service.citations.research_lineage(
         db, current_user.id, paper_id, max_depth
@@ -507,7 +507,7 @@ async def get_research_frontier(
     top_k: int = Query(default=20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """识别研究前沿"""
     return await library_service.citations.research_frontier(
         db, current_user.id, year_from, top_k
@@ -520,7 +520,7 @@ async def detect_research_clusters(
     min_cluster_size: int = Query(default=3, ge=2, le=20),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """检测研究聚类/社区"""
     return await library_service.citations.detect_clusters(
         db, current_user.id, algorithm, min_cluster_size
@@ -532,7 +532,7 @@ async def get_citation_timeline(
     paper_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """获取论文引用时间线"""
     return await library_service.citations.citation_timeline(
         db, current_user.id, paper_id
@@ -574,7 +574,7 @@ async def create_note(
     request: NoteCreateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> NoteResponse:
     """创建阅读笔记"""
     try:
         data = await library_service.notes.create_note(
@@ -595,7 +595,7 @@ async def list_notes(
     paper_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> list[NoteResponse]:
     """获取论文阅读笔记"""
     items = await library_service.notes.list_notes(db, current_user.id, paper_id)
     return [NoteResponse(**d) for d in items]
@@ -607,7 +607,7 @@ async def update_note(
     request: NoteUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> NoteResponse:
     """更新阅读笔记"""
     try:
         data = await library_service.notes.update_note(
@@ -628,7 +628,7 @@ async def delete_note(
     note_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, str]:
     """删除阅读笔记"""
     try:
         await library_service.notes.delete_note(db, current_user.id, note_id)

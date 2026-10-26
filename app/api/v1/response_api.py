@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -21,7 +23,7 @@ class DraftResponseRequest(BaseModel):
     reviewer_comments: list[str] = Field(
         default_factory=list, description="审稿意见列表（与 review_result 二选一）"
     )
-    review_result: dict | None = Field(
+    review_result: dict[str, Any] | None = Field(
         default=None,
         description="reviewer 结构化审稿结果（B3 串联），自动派生审稿意见",
     )
@@ -95,7 +97,7 @@ class ReviseResponseResponse(BaseModel):
 @router.post("/draft", response_model=DraftResponseResponse)
 async def draft_response(
     request: DraftResponseRequest, current_user: User = Depends(get_current_user)
-):
+) -> DraftResponseResponse:
     """起草审稿回复信"""
     logger.info(
         f"用户 {current_user.id} 起草回复: 决策={request.decision_type}, "
@@ -126,7 +128,7 @@ async def draft_response(
 @router.post("/audit", response_model=AuditResponseResponse)
 async def audit_response(
     request: AuditResponseRequest, current_user: User = Depends(get_current_user)
-):
+) -> AuditResponseResponse:
     """审计审稿回复的完整性和语气"""
     logger.info(f"用户 {current_user.id} 审计回复")
 
@@ -149,7 +151,7 @@ async def audit_response(
 @router.post("/revise", response_model=ReviseResponseResponse)
 async def revise_response(
     request: ReviseResponseRequest, current_user: User = Depends(get_current_user)
-):
+) -> ReviseResponseResponse:
     """修改审稿回复"""
     logger.info(f"用户 {current_user.id} 修改回复")
 

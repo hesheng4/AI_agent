@@ -17,9 +17,9 @@
 """
 
 import uuid
-from typing import Any
+from typing import Any, cast
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import CursorResult, delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -459,13 +459,13 @@ class CategoryService:
             raise CategoryNotFoundError()
 
         # 把该分类下的 papers 改为 uncategorized
-        result = await db.execute(
+        papers_result = await db.execute(
             select(PaperCollection).where(
                 PaperCollection.user_id == user_id,
                 PaperCollection.category == category.name,
             )
         )
-        for p in result.scalars().all():
+        for p in papers_result.scalars().all():
             p.category = "uncategorized"
 
         await db.execute(
@@ -477,10 +477,10 @@ class CategoryService:
         await db.commit()
 
     async def _adjust_paper_count(
-        self, db: AsyncSession, user_id: str, category_name: str, delta: int
+        self, db: AsyncSession, user_id: str, category_name: str | None, delta: int
     ) -> None:
         """调整分类的 paper_count
-        （按 name 匹配，因为 PaperCollection.category 存的是 name）
+        （按 name 匹配，因为 PaperCollection.category 存的是 name；None 安全跳过）
         """
         if not category_name or category_name == "uncategorized":
             return  # uncategorized 不是真实的分类记录
@@ -538,13 +538,13 @@ class TagService:
             raise TagNotFoundError()
 
         # 从所有 papers 的 tags 列表里移除
-        result = await db.execute(
+        papers_result = await db.execute(
             select(PaperCollection).where(
                 PaperCollection.user_id == user_id,
                 PaperCollection.tags.like(f'%"{tag.name}"%'),
             )
         )
-        for p in result.scalars().all():
+        for p in papers_result.scalars().all():
             if p.tags:
                 p.tags = [t for t in p.tags if t != tag.name]
 
@@ -575,11 +575,14 @@ class TagService:
                 current = tag.usage_count or 0
                 tag.usage_count = max(0, current + delta)
             elif delta > 0:
+                # 首次使用即创建：创建本身就消耗 1 次 usage（否则首个
+                # 引用它的文献永远少计 1，见 fork 黄金测试 G8）
                 db.add(
                     PaperTag(
                         id=str(uuid.uuid4()),
                         user_id=user_id,
                         name=name,
+                        usage_count=delta,
                     )
                 )
 
@@ -728,11 +731,14 @@ class CitationService:
     async def delete_citation(
         self, db: AsyncSession, user_id: str, citation_id: str
     ) -> None:
-        result = await db.execute(
-            delete(CitationRelation).where(
-                CitationRelation.user_id == user_id,
-                CitationRelation.id == citation_id,
-            )
+        result = cast(
+            "CursorResult[Any]",
+            await db.execute(
+                delete(CitationRelation).where(
+                    CitationRelation.user_id == user_id,
+                    CitationRelation.id == citation_id,
+                )
+            ),
         )
         if result.rowcount == 0:
             raise CitationNotFoundError()
@@ -742,15 +748,17 @@ class CitationService:
 
     async def _build_network(self, db: AsyncSession, user_id: str) -> CitationNetwork:
         """加载用户所有 papers + citations，构建 CitationNetwork"""
-        result = await db.execute(
+        citation_result = await db.execute(
             select(CitationRelation).where(CitationRelation.user_id == user_id)
         )
-        citations = result.scalars().all()
+        citations = citation_result.scalars().all()
 
-        result = await db.execute(
+        # 独立变量名：mypy 按首次绑定定型，复用 result 会把
+        # papers 误推为 CitationRelation
+        papers_result = await db.execute(
             select(PaperCollection).where(PaperCollection.user_id == user_id)
         )
-        papers = result.scalars().all()
+        papers = papers_result.scalars().all()
 
         network = CitationNetwork()
         for p in papers:
@@ -925,11 +933,14 @@ class NoteService:
         return note_to_dict(note)
 
     async def delete_note(self, db: AsyncSession, user_id: str, note_id: str) -> None:
-        result = await db.execute(
-            delete(ReadingNote).where(
-                ReadingNote.user_id == user_id,
-                ReadingNote.id == note_id,
-            )
+        result = cast(
+            "CursorResult[Any]",
+            await db.execute(
+                delete(ReadingNote).where(
+                    ReadingNote.user_id == user_id,
+                    ReadingNote.id == note_id,
+                )
+            ),
         )
         if result.rowcount == 0:
             raise NoteNotFoundError()
@@ -972,8 +983,8 @@ class LibraryStatsService:
         )
         favorite_count = result.scalar() or 0
 
-        # 最近文献
-        result = await db.execute(
+        # 最近文献（独立变量名：mypy 按首次绑定定型，复用 result 会误推为 int）
+        recent_result = await db.execute(
             select(PaperCollection)
             .where(PaperCollection.user_id == user_id)
             .order_by(PaperCollection.created_at.desc())
@@ -981,11 +992,11 @@ class LibraryStatsService:
         )
         recent_papers = [
             {"id": p.id, "title": p.title, "year": p.year}
-            for p in result.scalars().all()
+            for p in recent_result.scalars().all()
         ]
 
         # 热门分类
-        result = await db.execute(
+        categories_result = await db.execute(
             select(PaperCategory)
             .where(PaperCategory.user_id == user_id)
             .order_by(PaperCategory.paper_count.desc())
@@ -993,11 +1004,11 @@ class LibraryStatsService:
         )
         top_categories = [
             {"name": c.name, "count": c.paper_count or 0}
-            for c in result.scalars().all()
+            for c in categories_result.scalars().all()
         ]
 
         # 热门标签
-        result = await db.execute(
+        tags_result = await db.execute(
             select(PaperTag)
             .where(PaperTag.user_id == user_id)
             .order_by(PaperTag.usage_count.desc())
@@ -1005,7 +1016,7 @@ class LibraryStatsService:
         )
         top_tags = [
             {"name": t.name, "count": t.usage_count or 0}
-            for t in result.scalars().all()
+            for t in tags_result.scalars().all()
         ]
 
         return {
@@ -1031,7 +1042,7 @@ class LibraryService:
         await svc.citations.get_graph(db, user_id, paper_id, depth=2)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.papers = PaperService()
         self.categories = CategoryService()
         self.tags = TagService()

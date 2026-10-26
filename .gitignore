@@ -103,3 +103,9 @@ poetry.lock
 
 # Node
 node_modules/
+
+# 运行期产物（未跟踪但防误提交）
+uploads/
+server.log
+server.err.log
+*.log

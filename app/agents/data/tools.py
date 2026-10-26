@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]  # pandas-stubs 未安装
 
 from app.utils.exceptions import ToolException
 from app.utils.logger import get_logger
@@ -176,7 +176,7 @@ class DataTools:
         logger.info(f"异常值检测: method={method}")
 
         numeric_cols = df.select_dtypes(include=[np.number]).columns
-        outliers = {}
+        outliers: dict[str, dict[str, Any]] = {}
 
         for col in numeric_cols:
             if method == "iqr":

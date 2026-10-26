@@ -244,7 +244,7 @@ def workflow_to_execution_plan(workflow: dict[str, Any]) -> list[dict[str, Any]]
     return plan
 
 
-def _save_workflow(user_id: str, workflow_id: str, data: dict) -> None:
+def _save_workflow(user_id: str, workflow_id: str, data: dict[str, Any]) -> None:
     """W5: 原子写入 — 先写临时文件再 rename，防中途崩溃产生半截 JSON
     R6: rename 失败时清理临时文件，避免垃圾累积
     """

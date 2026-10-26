@@ -9,6 +9,8 @@
 6. 生成后验证
 """
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -75,7 +77,7 @@ class ValidateSkillRequest(BaseModel):
 
 
 @router.get("/status")
-async def history_to_skill_status():
+async def history_to_skill_status() -> dict[str, Any]:
     """模块状态"""
     return {
         "module": "ascend_history_to_skill",
@@ -94,7 +96,7 @@ async def history_to_skill_status():
 
 
 @router.get("/variants/{model_name}")
-async def get_model_variants(model_name: str):
+async def get_model_variants(model_name: str) -> dict[str, Any]:
     """Step 1: 获取模型名变体
 
     用于扩大搜索范围，覆盖连字符/下划线/大小写变体
@@ -111,7 +113,7 @@ async def get_model_variants(model_name: str):
 async def discover_roots(
     sources: str | None = None,
     extra_root: list[str] | None = None,
-):
+) -> dict[str, Any]:
     """Step 2: 发现可用历史记录根目录
 
     检测本地 Codex / Claude Code / OpenCode / Cursor 历史存储路径
@@ -134,7 +136,7 @@ async def discover_roots(
 
 
 @router.post("/search")
-async def search_history_endpoint(req: SearchHistoryRequest):
+async def search_history_endpoint(req: SearchHistoryRequest) -> dict[str, Any]:
     """Step 2-3: 搜索历史记录并过滤
 
     搜索后自动过滤低价值证据，保留已验证命令、代码修改、
@@ -186,7 +188,7 @@ async def search_history_endpoint(req: SearchHistoryRequest):
 
 
 @router.post("/generate")
-async def generate_skill_endpoint(req: GenerateSkillRequest):
+async def generate_skill_endpoint(req: GenerateSkillRequest) -> dict[str, Any]:
     """Step 5: 从历史记录生成模型 Skill
 
     完整流程：搜索 → 过滤 → 整理 → 生成
@@ -216,7 +218,7 @@ async def generate_skill_endpoint(req: GenerateSkillRequest):
 
 
 @router.post("/run")
-async def run_full_pipeline(req: GenerateSkillRequest):
+async def run_full_pipeline(req: GenerateSkillRequest) -> dict[str, Any]:
     """一键执行完整流程 (Step 1-6)
 
     明确目标 → 搜索 → 过滤 → 整理 → 生成 → 验证
@@ -246,7 +248,7 @@ async def run_full_pipeline(req: GenerateSkillRequest):
 
 
 @router.post("/validate")
-async def validate_skill_endpoint(req: ValidateSkillRequest):
+async def validate_skill_endpoint(req: ValidateSkillRequest) -> dict[str, Any]:
     """Step 6: 验证已生成的 Skill
 
     结构验证 + 内容验证
@@ -271,7 +273,7 @@ async def validate_skill_endpoint(req: ValidateSkillRequest):
 
 
 @router.get("/quick-reference")
-async def quick_reference():
+async def quick_reference() -> dict[str, Any]:
     """快速参考"""
     return {
         "workflow": [

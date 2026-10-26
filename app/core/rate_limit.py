@@ -11,6 +11,7 @@
 import time
 import uuid
 from abc import ABC, abstractmethod
+from typing import Any
 
 from fastapi import HTTPException, Request, status
 
@@ -45,10 +46,10 @@ class MemoryRateLimiter(RateLimiterBackend):
 
     def __init__(self, max_users: int = 100_000):
         # {user_id: {"requests": [timestamp]}}
-        self._requests: dict[str, dict] = {}
+        self._requests: dict[str, dict[str, Any]] = {}
         self._max_users = max_users
 
-    def _global_cleanup(self, window: int = 60):
+    def _global_cleanup(self, window: int = 60) -> None:
         """全量清理：删除所有窗口内无有效请求的用户
 
         判定标准为该用户是否还存在 window 内的有效请求——只要有一条未过期就保留，
@@ -67,7 +68,7 @@ class MemoryRateLimiter(RateLimiterBackend):
         for user_id in expired_users:
             del self._requests[user_id]
 
-    def _cleanup_old_requests(self, user_id: str, window: int = 60):
+    def _cleanup_old_requests(self, user_id: str, window: int = 60) -> None:
         if user_id not in self._requests:
             return
         now = time.time()
@@ -151,10 +152,10 @@ class RedisRateLimiter(RateLimiterBackend):
     def __init__(self, key_prefix: str = "ratelimit:", fallback: str = "allow"):
         self.key_prefix = key_prefix
         self.fallback = fallback
-        self._check_script = None
-        self._remaining_script = None
+        self._check_script: Any = None
+        self._remaining_script: Any = None
 
-    def _redis(self):
+    def _redis(self) -> Any:
         from app.core.redis_client import get_redis
 
         return get_redis()
@@ -260,14 +261,14 @@ RATE_LIMITS = {
 }
 
 
-def get_rate_limit_config(plan: str) -> dict:
+def get_rate_limit_config(plan: str) -> dict[str, int]:
     """获取套餐的速率限制配置"""
     return RATE_LIMITS.get(plan, RATE_LIMITS["free"])
 
 
 async def check_rate_limit_middleware(
     request: Request, user_id: str, plan: str = "free"
-):
+) -> bool:
     """速率限制检查中间件"""
     config = get_rate_limit_config(plan)
 

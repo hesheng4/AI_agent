@@ -73,7 +73,9 @@ class ExperimentTools:
         return design
 
     @staticmethod
-    def _generate_groups(design_type: str, variables: list[str]) -> list[dict]:
+    def _generate_groups(
+        design_type: str, variables: list[str]
+    ) -> list[dict[str, Any]]:
         """生成实验组"""
         if design_type == "between":
             return [
@@ -187,7 +189,9 @@ class ExperimentTools:
 
     @staticmethod
     def optimize_parameters(
-        historical_data: list[dict], target_metric: str = "score", method: str = "grid"
+        historical_data: list[dict[str, Any]],
+        target_metric: str = "score",
+        method: str = "grid",
     ) -> dict[str, Any]:
         """优化参数"""
         logger.info(f"参数优化: 方法={method}, 数据量={len(historical_data)}")
@@ -196,7 +200,7 @@ class ExperimentTools:
             return {"optimized_params": {}, "confidence": 0, "message": "无历史数据"}
 
         # 提取参数和结果
-        all_params = {}
+        all_params: dict[str, list[Any]] = {}
         best_score = float("-inf")
         best_params = {}
 
@@ -246,7 +250,9 @@ class ExperimentTools:
 
     @staticmethod
     def predict_result(
-        params: dict, historical_data: list[dict], target_metric: str = "score"
+        params: dict[str, Any],
+        historical_data: list[dict[str, Any]],
+        target_metric: str = "score",
     ) -> dict[str, Any]:
         """预测结果"""
         logger.info(f"预测结果: {params}")
@@ -293,7 +299,9 @@ class ExperimentTools:
         }
 
     @staticmethod
-    def _calculate_similarity(params1: dict, params2: dict) -> float:
+    def _calculate_similarity(
+        params1: dict[str, Any], params2: dict[str, Any]
+    ) -> float:
         """计算参数相似度"""
         common_keys = set(params1.keys()) & set(params2.keys())
         if not common_keys:
@@ -393,7 +401,7 @@ class ExperimentTools:
 
     @staticmethod
     def sensitivity_analysis(
-        n_range: list[int] = None,
+        n_range: list[int] | None = None,
         alpha: float = 0.05,
         power: float = 0.8,
         test_type: str = "ttest",

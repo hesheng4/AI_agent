@@ -1,11 +1,14 @@
+import re
 import time
 import uuid
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -38,7 +41,7 @@ async def _run_alembic_upgrade() -> None:
     if not alembic_ini_path.exists():
         raise FileNotFoundError(f"未找到 alembic.ini: {alembic_ini_path}")
 
-    def _sync_upgrade():
+    def _sync_upgrade() -> None:
         cfg = Config(str(alembic_ini_path))
         cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
         command.upgrade(cfg, "head")
@@ -47,7 +50,7 @@ async def _run_alembic_upgrade() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Startup
     logger.info(f"启动 {settings.APP_NAME}")
     logger.info(f"调试模式: {settings.DEBUG}")
@@ -217,7 +220,9 @@ def create_app() -> FastAPI:
 
     # 全局异常处理
     @app.exception_handler(AppException)
-    async def app_exception_handler(request: Request, exc: AppException):
+    async def app_exception_handler(
+        request: Request, exc: AppException
+    ) -> JSONResponse:
         logger.warning(f"应用异常: {exc.code} - {exc.message}")
         return JSONResponse(
             status_code=exc.status_code,
@@ -225,7 +230,9 @@ def create_app() -> FastAPI:
         )
 
     @app.exception_handler(ValidationException)
-    async def validation_exception_handler(request: Request, exc: ValidationException):
+    async def validation_exception_handler(
+        request: Request, exc: ValidationException
+    ) -> JSONResponse:
         logger.warning(f"验证异常: {exc.message}")
         return JSONResponse(
             status_code=400,
@@ -233,7 +240,9 @@ def create_app() -> FastAPI:
         )
 
     @app.exception_handler(Exception)
-    async def general_exception_handler(request: Request, exc: Exception):
+    async def general_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
         # 兼容未继承 AppException 但携带 status_code/message 属性的业务异常
         # （如 LibraryError 及其子类），按其声明的状态码返回
         if (
@@ -269,9 +278,26 @@ def create_app() -> FastAPI:
     max_body = settings.MAX_REQUEST_BODY_BYTES
 
     @app.middleware("http")
-    async def limit_request_body(request: Request, call_next):
+    async def limit_request_body(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         cl = request.headers.get("Content-Length")
-        if cl is not None:
+        if cl is None:
+            # S2 补强：chunked 传输没有 Content-Length，先前实现直接放行，
+            # 是 2MB 上限的完整绕过路径（内存耗尽防护失效）。
+            # 平台客户端（浏览器前端/测试/直连 API）都发送 Content-Length；
+            # 对 chunked 一律 411 Length Required，不给绕过留口子。
+            te = request.headers.get("Transfer-Encoding", "")
+            if "chunked" in te.lower() and request.method in (
+                "POST",
+                "PUT",
+                "PATCH",
+            ):
+                return JSONResponse(
+                    status_code=411,
+                    content={"detail": "请使用 Content-Length 声明请求体大小"},
+                )
+        else:
             try:
                 if int(cl) > max_body:
                     return JSONResponse(
@@ -287,9 +313,14 @@ def create_app() -> FastAPI:
 
     # 请求日志中间件
     @app.middleware("http")
-    async def log_requests(request: Request, call_next):
-        # 请求ID：优先复用客户端传入，否则生成
-        request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:12]
+    async def log_requests(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        # 请求ID：优先复用客户端传入，否则生成。
+        # 客户端可控字符串：仅保留安全字符并截断，防日志注入/超长刷盘
+        raw_request_id = request.headers.get("X-Request-ID") or ""
+        safe_request_id = re.sub(r"[^A-Za-z0-9_-]", "", raw_request_id)[:32]
+        request_id = safe_request_id or uuid.uuid4().hex[:12]
         # 透传到下游（日志/LLM/外部调用可关联）
         request.state.request_id = request_id
         start = time.perf_counter()
@@ -323,7 +354,7 @@ def create_app() -> FastAPI:
 
         # 前端 SPA 入口 — 所有非 /api 路径都返回 index.html，由前端路由处理
         @app.get("/{full_path:path}")
-        async def serve_spa(full_path: str, request: Request):
+        async def serve_spa(full_path: str, request: Request) -> FileResponse:
             # 排除 API 路径（已被上面的 router 处理，这里兜底）
             api_prefix = settings.API_V1_PREFIX.lstrip("/")
             if full_path.startswith(api_prefix + "/") or full_path == api_prefix:
@@ -357,9 +388,9 @@ app = create_app()
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, Any]:
     """健康检查 - 包含数据库、Milvus、Redis、昇腾 NPU 状态"""
-    health = {
+    health: dict[str, Any] = {
         "status": "ok",
         "app": settings.APP_NAME,
         "llm_mode": settings.LLM_MODE,

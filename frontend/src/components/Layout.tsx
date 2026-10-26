@@ -45,6 +45,8 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/app/paper-to-patent', icon: 'fa-award', label: '论文转专利' },
       { to: '/app/submission-package', icon: 'fa-box', label: '投稿打包' },
       { to: '/app/data-availability', icon: 'fa-database', label: '数据可用性' },
+      { to: '/app/artifacts', icon: 'fa-box-archive', label: '结果存档' },
+      { to: '/app/shares', icon: 'fa-share-nodes', label: '分享与Fork' },
       { to: '/app/export', icon: 'fa-download', label: '数据导出' },
     ],
   },

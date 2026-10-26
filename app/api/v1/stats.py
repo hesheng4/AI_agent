@@ -27,7 +27,9 @@ class StatsResponse(BaseModel):
 
 
 @router.post("/", response_model=StatsResponse)
-async def stats_endpoint(req: StatsRequest, user: User = Depends(get_current_user)):
+async def stats_endpoint(
+    req: StatsRequest, user: User = Depends(get_current_user)
+) -> StatsResponse:
     result = await _agent.process(
         {
             **req.model_dump(),

@@ -1,6 +1,6 @@
 """昇腾 NPU 状态 API - 提供设备信息、服务健康状态"""
 
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -21,9 +21,9 @@ class SwitchModeRequest(BaseModel):
 
 
 @router.get("/info")
-async def ascend_info():
+async def ascend_info() -> dict[str, Any]:
     """获取昇腾 NPU 环境信息"""
-    info = {
+    info: dict[str, Any] = {
         "llm_mode": settings.LLM_MODE,
         "embedding_mode": settings.EMBEDDING_MODE,
     }
@@ -80,7 +80,7 @@ async def ascend_info():
 
 
 @router.get("/vllm-health")
-async def vllm_health():
+async def vllm_health() -> dict[str, Any]:
     """检查 vLLM-Ascend 服务健康状态"""
     try:
         from app.core.ascend import get_vllm_client
@@ -93,9 +93,9 @@ async def vllm_health():
 
 
 @router.post("/warmup")
-async def warmup_ascend():
+async def warmup_ascend() -> dict[str, Any]:
     """预热昇腾推理服务（首次推理较慢，提前触发编译缓存）"""
-    results = {}
+    results: dict[str, Any] = {}
 
     # LLM 预热
     if settings.LLM_MODE == "ascend":
@@ -130,7 +130,7 @@ async def warmup_ascend():
 
 
 @router.put("/mode")
-async def switch_llm_mode(request: SwitchModeRequest):
+async def switch_llm_mode(request: SwitchModeRequest) -> dict[str, Any]:
     """运行时切换 LLM 推理模式（remote / ascend）"""
     new_mode = request.llm_mode
 
@@ -169,7 +169,7 @@ async def switch_llm_mode(request: SwitchModeRequest):
     _user_client_cache.clear()
 
     # 返回更新后的状态
-    result = {
+    result: dict[str, Any] = {
         "llm_mode": settings.LLM_MODE,
         "embedding_mode": settings.EMBEDDING_MODE,
         "previous_mode": old_mode,
