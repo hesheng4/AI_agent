@@ -6,7 +6,7 @@ authors = ["Research Team"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.14"
 fastapi = "^0.104.0"
 uvicorn = "^0.24.0"
 pydantic = "^2.5.0"
@@ -25,12 +25,16 @@ pandas = "^2.1.4"
 numpy = "^1.26.2"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.4.3"
-pytest-asyncio = "^0.23.2"
-pytest-cov = "^4.1.0"
-black = "^23.12.0"
-ruff = "^0.1.8"
-mypy = "^1.7.1"
+# 版本对齐 2026-09-07：与 .venv 实测安装版本一致（原声明为 ^7.4.3 / ^0.23.2 /
+# ^4.1.0 / ^23.12.0 / ^0.1.8 / ^1.7.1，全部低于实际所用大版本，导致
+# `poetry install` 出来的工具链与本地不一致、检查结果不可复现）。
+# CI 使用同一批版本，避免静态检查结论随工具版本漂移。
+pytest = "^9.1.0"
+pytest-asyncio = "^1.4.0"
+pytest-cov = "^7.1.0"
+black = "^26.5.1"
+ruff = "^0.15.18"
+mypy = "^2.1.0"
 # 数值黄金测试基准：tests/unit/test_numerical_golden.py 用它交叉校验
 # 手写的统计/功效实现。仅测试用，不进生产依赖（生产保持零第三方依赖手写）。
 scipy = ">=1.11"
@@ -39,11 +43,11 @@ python-docx = ">=1.1"
 
 [tool.black]
 line-length = 88
-target-version = ['py311']
+target-version = ['py314']
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "YTT"]
@@ -55,9 +59,10 @@ select = ["E", "F", "W", "I", "N", "UP", "YTT"]
 "app/agents/*/scripts/*.py" = ["E501"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.14"
 strict = true
-# 类型收敛策略（体检报告 P2-13）：存量 1198 错渐进修复，新文件必须零新增——
+# 类型收敛策略（体检报告 P2-13）：存量 890 错渐进修复（2026-09-07 实测，原注 1198 为失实数字），
+# 新文件必须零新增——
 # 提交前跑 mypy 只看自己改动文件的错误数不上升。
 # agents/*/scripts/ 是独立 CLI 模板（自带 sys.path 引导与文本模板），不参与类型检查
 exclude = 'app/agents/[^/]+/scripts/'

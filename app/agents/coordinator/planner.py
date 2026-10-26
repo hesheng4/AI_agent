@@ -83,7 +83,7 @@ SKILL_KEYWORD_MAP: list[tuple[str, list[str], list[str]]] = [
         ],
     ),
     (
-        # 「报告」已移除：泛化「请给一份报告」曾误路由 PPT（差距 #1），零命中由 LLM 兜底判定
+        # 「报告」已移除：泛化「请给一份报告」曾误路由 PPT（差距 #1），零命中走 LLM 兜底
         "paper2ppt",
         ["PPT", "演讲", "转化PPT"],
         ["paper2ppt", "ppt", "presentation", "slides"],
@@ -262,7 +262,7 @@ WORKFLOW_TEMPLATES: dict[str, dict[str, Any]] = {
         "label": "修稿",
         "steps": [
             {"step": 1, "agent": "reader", "task": "read", "desc": "审读稿件与意见"},
-            {"step": 2, "agent": "reviewer", "task": "assess", "desc": "评审意见结构化"},
+            {"step": 2, "agent": "reviewer", "task": "assess", "desc": "意见结构化"},
             {"step": 3, "agent": "response", "task": "draft", "desc": "逐条回复起草"},
             {"step": 4, "agent": "writing", "task": "revise", "desc": "修改论文"},
             {"step": 5, "agent": "polishing", "task": "polish", "desc": "润色修改稿"},

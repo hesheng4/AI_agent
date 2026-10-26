@@ -174,7 +174,7 @@ class ReferenceVerification:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ReferenceVerification":
+    def from_dict(cls, data: dict[str, Any]) -> ReferenceVerification:
         return cls(**data)
 
 

@@ -37,10 +37,5 @@ numpy>=1.26.2
 # 工具
 python-dotenv>=1.0.0
 
-# 开发依赖 (可选)
-# pytest>=7.4.3
-# pytest-asyncio>=0.23.2
-# pytest-cov>=4.1.0
-# black>=23.12.0
-# ruff>=0.1.8
-# mypy>=1.7.1
+# 开发依赖（含测试与静态检查，版本对齐实测）：见 requirements-dev.txt
+#   pip install -r requirements-dev.txt

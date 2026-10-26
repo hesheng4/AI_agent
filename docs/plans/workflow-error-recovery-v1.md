@@ -59,7 +59,9 @@
 - **unit（coordinator 挂钩）**：fail-fast 失败步写入 run 记录；步级超时合成为 transient 失败并落盘。
 - **integration/e2e**：3 步计划第 2 步注入失败 → orchestrate 返回 failed + run_id；resume 后仅执行 2–3 步（断言第 1 步 agent 未被再次调用）；计划变更后 resume → 409；并发二次 resume → 409；对 succeeded run resume → 409。
 - **security**：用户 A 不能 resume 用户 B 的 run（对齐 W1/W2 纪律）。
-- **regression**：非模板路径 partial_failure 语义不变；全量套件不低于 776 passed 基线。
+- **regression**：非模板路径 partial_failure 语义不变；全量套件不低于 **545 passed** 基线
+  （2026-09-07 修正：原文「776 passed」为未经核实的手写数字，从未存在；实测基线 545，
+  见 `docs/plans/credibility-convergence-v1.md`）。
 
 ## 建议实施顺序
 

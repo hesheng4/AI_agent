@@ -190,7 +190,7 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     @classmethod
-    def from_user(cls, user: User) -> "UserResponse":
+    def from_user(cls, user: User) -> UserResponse:
         return cls(
             id=user.id,
             email=user.email,

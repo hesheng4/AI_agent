@@ -1,0 +1,25 @@
+# 开发 / 测试 / CI 依赖
+#
+# 版本对齐 2026-09-07 实测安装版本（原 requirements.txt 内注释的版本普遍低一个大版本，
+# 会导致 CI 与本地静态检查结论不一致）。详见 docs/plans/credibility-convergence-v1.md 门禁 G9。
+#
+# 用法：
+#   pip install -r requirements-dev.txt
+
+-r requirements.txt
+
+# 测试
+pytest>=9.1.0
+pytest-asyncio>=1.4.0
+pytest-cov>=7.1.0
+
+# 静态检查与格式化
+black>=26.5.1
+ruff>=0.15.18
+mypy>=2.1.0
+
+# 数值黄金测试：tests/unit/test_numerical_golden.py 以 scipy 为独立 oracle，
+# 交叉校验手写统计/功效实现。仅测试用，生产保持零第三方依赖。
+scipy>=1.11
+# tests/unit/test_latex_l7_omml_semantics.py 依赖 docx 解析 OMML
+python-docx>=1.1

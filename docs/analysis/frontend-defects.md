@@ -1,5 +1,18 @@
 # 前端缺陷分析
 
+> ## ⚠️ 本文已作废（2026-09-07 核实）
+>
+> 本文第一节「13 模块无前端」**已不成立**：所列 13 个模块（reader / reviewer / response /
+> citation / figure / paper2ppt / paper-to-patent / coordinator / export / cover / methods /
+> submission-package / polishing / stats）的页面**均已落地**。
+> 当前前端实测 **27 个顶层页面 + 9 个昇腾子页 = 36 个页面**。
+>
+> 本文其余章节（API 层 / 架构 / 交互 / 导航 / 安全 / 性能）为当时快照，**未复核**，
+> 引用前请自行验证。前端最新状态见 `reports/uiux-audit-report.html`
+> （2026-08-31：P0 设计 Token 断链已修复并验证，21/21 对比度 PASS，剩 8 项 MEDIUM backlog）。
+>
+> 保留本文仅作历史追溯，请勿作为现状依据。
+
 ## 一、功能缺失 — 13 模块无前端
 
 | 模块 | 后端端点 | 影响 |

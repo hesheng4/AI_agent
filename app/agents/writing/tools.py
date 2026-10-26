@@ -1054,7 +1054,7 @@ class WritingTools:
         key_to_index: dict[str, int] = {}
         pattern = re.compile(r"\[CITE:([^\]]+)\]|\{\{([^}]+)\}\}")
 
-        def _replace(m: "re.Match[str]") -> str:
+        def _replace(m: re.Match[str]) -> str:
             key = (m.group(1) or m.group(2) or "").strip()
             if not key:
                 return m.group(0)

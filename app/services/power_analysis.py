@@ -434,7 +434,8 @@ class PowerAnalysis:
             1 - alpha / 2 if test_type == "two-sided" else 1 - alpha
         )
         v = float(df)
-        z2, z3, z5, z7 = z * z, z**3, z**5, z**7
+        # 三阶 Cornish-Fisher 展开只含 z 的奇次项，无 z² 项（z2 为死变量，已移除）
+        z3, z5, z7 = z**3, z**5, z**7
         return (
             z
             + (z3 + z) / (4 * v)

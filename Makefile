@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format run docker-build docker-run docker-stop clean
+.PHONY: help install dev test lint format baseline check-types ci run docker-build docker-run docker-stop clean
 
 help:
 	@echo "可用命令:"
@@ -6,8 +6,11 @@ help:
 	@echo "  make dev          - 安装开发依赖"
 	@echo "  make test         - 运行测试"
 	@echo "  make test-cov     - 运行测试并生成覆盖率报告"
-	@echo "  make lint         - 代码检查"
+	@echo "  make lint         - 代码检查（ruff；mypy 请改用 check-types）"
 	@echo "  make format       - 代码格式化"
+	@echo "  make baseline     - 重新生成 mypy 基线（每合并一批修复后执行）"
+	@echo "  make check-types  - mypy 增量校验（改动文件不得上升）"
+	@echo "  make ci           - 本地复刻 CI 三条门禁"
 	@echo "  make run          - 启动开发服务器"
 	@echo "  make docker-build - 构建Docker镜像"
 	@echo "  make docker-up    - 启动Docker服务"
@@ -19,7 +22,7 @@ install:
 	pip install -r requirements.txt || poetry install
 
 dev:
-	pip install pytest pytest-asyncio pytest-cov black ruff mypy || poetry install --with dev
+	pip install -r requirements-dev.txt || poetry install --with dev
 
 test:
 	python -m pytest tests/ -v
@@ -29,11 +32,27 @@ test-cov:
 
 lint:
 	ruff check app tests
-	mypy app
 
 format:
 	black app tests
 	ruff check --fix app tests
+
+# mypy 基线：存量 890 条冻结在 reports/mypy-baseline.txt，只做增量归零。
+# 合并任何修复批次后必须重跑 baseline，数字单调不增。
+baseline:
+	python scripts/gen_mypy_baseline.py
+
+check-types:
+	git diff --name-only origin/master...HEAD -- 'app/**/*.py' \
+		| python scripts/gen_mypy_baseline.py --check --stdin
+
+ci:
+	@echo "=== 1/3 ruff ==="
+	@ruff check app
+	@echo "=== 2/3 mypy（增量）==="
+	@$(MAKE) --silent check-types
+	@echo "=== 3/3 pytest ==="
+	@python -m pytest -q --no-header
 
 run:
 	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

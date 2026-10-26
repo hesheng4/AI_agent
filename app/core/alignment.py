@@ -74,7 +74,7 @@ class ComparisonConstraints:
     def to_dict(self) -> dict[str, Any]:
         return self.__dict__
 
-    def diff(self, other: "ComparisonConstraints") -> dict[str, Any]:
+    def diff(self, other: ComparisonConstraints) -> dict[str, Any]:
         """对比两组约束，返回差异项"""
         differences = {}
         for key in self.__dict__:

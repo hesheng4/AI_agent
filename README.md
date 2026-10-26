@@ -33,21 +33,31 @@
 
 #### 昇腾工作台（本地化推理）
 
-| 模块 | Agent / 核心 | 功能 | 状态 |
-|------|------|------|------|
-| 环境概览 | `ascend` | NPU 环境检测、设备管理、资源监控 | ✅ |
-| 模型适配 | `adaptation` | 远程/昇腾模型切换、适配层封装 | ⚠️ 实验性（权重加载/前向推理/算子注册未实现） |
-| 精度对齐 | `alignment` | 远程 vs 本地推理精度对齐验证 | ✅ |
-| 性能采集 | `profiling` | NPU 性能数据采集 | ✅ |
-| 性能调优 | `perf_tuning` | 推理性能参数调优 | ✅ |
-| 推理工具链 | `toolchain` | vLLM-Ascend 工具链集成 | ✅ |
-| 模型验证 | `validator` | 模型推理质量验证 | ✅ |
-| 调试辅助 | `debugging` | NPU 推理调试支持 | ✅ |
-| 历史转技能 | `history_to_skill` | 历史记录转可复用技能 | ✅ |
+| 模块 | Agent / 核心 | 功能 | 状态 | 单测用例 |
+|------|------|------|------|------|
+| 环境概览 | `ascend` | NPU 环境检测、设备管理、资源监控 | ⚠️ 未实测 | 0 |
+| 模型适配 | `adaptation` | 远程/昇腾模型切换、适配层封装 | ⚠️ 未实测 | 12 |
+| 精度对齐 | `alignment` | 远程 vs 本地推理精度对齐验证 | ⚠️ 未实测 | 0 |
+| 性能采集 | `profiling` | NPU 性能数据采集 | ⚠️ 未实测 | 12 |
+| 性能调优 | `perf_tuning` | 推理性能参数调优 | ⚠️ 未实测 | 0 |
+| 推理工具链 | `toolchain` | vLLM-Ascend 工具链集成 | ⚠️ 未实测 | 3 |
+| 模型验证 | `validator` | 模型推理质量验证 | ⚠️ 未实测 | 3 |
+| 调试辅助 | `debugging` | NPU 推理调试支持 | ⚠️ 未实测 | 12 |
+| 历史转技能 | `history_to_skill` | 历史记录转可复用技能 | ⚠️ 未实测 | 3 |
 
+> **⚠️ 验证状态声明（2026-09-07 实测）**
+>
+> 开发环境（Windows 11）**无 `torch`、无 `torch_npu`、无 `/dev/davinci*` 设备**，
+> 上表 9 个模块（合计约 8500 行，占后端代码约 23%）**均未在真实 NPU 上运行验证**。
+> 「单测用例」一列为 mock / 纯逻辑单测数量，只能证明**调用路径符合预期**，
+> **不能证明在 NPU 上可正常运行**。`ascend` / `alignment` / `perf_tuning` 三个模块**零用例覆盖**。
+>
 > 昇腾 9 个模块以 core+api 形式实现，不在 `agents/` 目录与 Agent 注册体系中。
-> `adaptation` 为实验性：`app/core/adaptation.py` 中权重加载、前向推理、
-> vllm registry 注册、Triton 算子 NPU 兼容实现 4 处为 TODO。
+>
+> 关于 `adaptation`：它是**代码生成器**——产出的适配骨架文件内刻意保留
+> 权重加载、前向推理、vllm registry 注册、Triton 算子兼容实现 4 处占位符供人工填充
+> （这 4 处 `# TODO` 位于 f-string 模板字符串内，非运行时缺口）。
+> 该模块本身为实验性，未上真机验证。
 
 ### 🔧 系统特性
 
@@ -275,7 +285,7 @@ research-agent-platform/
 │   └── versions/
 │       └── 6ab33371ef5b_initial_baseline.py  # 初始 baseline（8 表 + 10 索引）
 ├── alembic.ini                # Alembic 配置
-├── tests/                     # 测试（763 passed / 9 skipped）
+├── tests/                     # 测试（545 passed / 1 skipped，2026-09-07 实测）
 │   ├── unit/                 # 单元测试（含数值黄金测试，见下）
 │   │   ├── test_numerical_golden.py        # 数值黄金测试：scipy 为 oracle 校验手写统计/功效实现
 │   │   └── test_citation_network_golden.py # 引用网络黄金测试：受控图解析解对照
