@@ -159,3 +159,24 @@
 | 新测试 | tests/e2e/test_export_billing_chain.py（export 5 端点 + billing 3 端点 HTTP 冒烟）与 tests/e2e/test_data_analysis_chain.py（data 3 端点：真实统计数值断言 + FakeLLM 桩），清偿 3 个零覆盖模块 |
 
 **最终门禁（2026-10-26）**：ruff 0 / pytest **580 passed, 1 skipped** / mypy **0**（基线 890 → 0）。
+
+---
+
+## 5. 第二批覆盖清偿（2026-10-27）
+
+library CRUD 全量 27 端点 + experiment 纯计算 2 端点 + research 域 LLM 冒烟 10 组，
+**测试 580 → 604 passed**，零覆盖路由模块从 17 降至约 4（paper2ppt/paper_to_patent/figure/review-loop，
+属文件生成或多轮循环域，另有进程内单测覆盖）。
+
+期间又挖出 **5 个真缺陷**（均带回归测试）：
+
+| # | 缺陷 | 修复 |
+|---|---|---|
+| L1 | `delete_paper` 级联删除引用按外部 paper_id 匹配，而引用以 DB id 建立 → 孤儿引用 | 双键空间匹配 |
+| L2 | `_lookup_title` 只查外部 paper_id → citing/cited_title 回填永远 None（README 宣称已实现） | 双键查找 |
+| L3 | `delete_tag` 的 `LIKE '%"标签"%'` 对中文标签必然落空（SQLite JSON ensure_ascii 转义）→ 中文标签删除后仍残留在文献上 | Python 侧过滤 |
+| L4 | `list_papers` 的 tag 筛选同样 LIKE 原文 → 中文标签筛选为空 | LIKE 同时匹配原文+转义形态 |
+| L5 | `get_citation_graph` 同一引用出边+入边各输出一次 → 前端画重叠边 | seen_edges 去重 |
+| L6 | `create_category/create_tag` 重名抛 IntegrityError → 500（应 400） | 预检 + 兜底 + 路由映射 |
+
+**门禁（2026-10-27）**：ruff 0 / pytest **604 passed, 1 skipped** / mypy **0**。

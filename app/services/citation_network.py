@@ -209,6 +209,15 @@ class CitationNetwork:
         nodes = []
         edges = []
         visited = set()
+        # 同一条引用会同时出现在 source 的出边与 target 的入边遍历里，
+        # 不去重会让前端对同一条引用画两条重叠边
+        seen_edges: set[tuple[str, str]] = set()
+
+        def _emit_edge(source: str, target: str) -> None:
+            key = (source, target)
+            if key not in seen_edges:
+                seen_edges.add(key)
+                edges.append({"source": source, "target": target, "type": "cites"})
 
         def bfs(current_id: str, current_depth: int) -> None:
             if current_depth > depth or current_id in visited:
@@ -229,16 +238,12 @@ class CitationNetwork:
 
             # 引用的论文（出边）
             for cited_id in self.adjacency.get(current_id, set()):
-                edges.append(
-                    {"source": current_id, "target": cited_id, "type": "cites"}
-                )
+                _emit_edge(current_id, cited_id)
                 bfs(cited_id, current_depth + 1)
 
             # 被引的论文（入边）
             for citing_id in self.reverse_adj.get(current_id, set()):
-                edges.append(
-                    {"source": citing_id, "target": current_id, "type": "cites"}
-                )
+                _emit_edge(citing_id, current_id)
                 bfs(citing_id, current_depth + 1)
 
         bfs(paper_id, 0)

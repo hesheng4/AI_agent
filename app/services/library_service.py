@@ -16,6 +16,7 @@
 路由层只负责参数解析、鉴权与响应序列化。
 """
 
+import json
 import uuid
 from typing import Any, cast
 
@@ -67,9 +68,19 @@ class CategoryNotFoundError(LibraryError):
         super().__init__(message, status_code=404)
 
 
+class CategoryAlreadyExistsError(LibraryError):
+    def __init__(self, message: str = "分类已存在"):
+        super().__init__(message, status_code=400)
+
+
 class TagNotFoundError(LibraryError):
     def __init__(self, message: str = "标签不存在"):
         super().__init__(message, status_code=404)
+
+
+class TagAlreadyExistsError(LibraryError):
+    def __init__(self, message: str = "标签已存在"):
+        super().__init__(message, status_code=400)
 
 
 class CitationNotFoundError(LibraryError):
@@ -252,8 +263,14 @@ class PaperService:
         if favorite is not None:
             query = query.where(PaperCollection.is_favorite == favorite)
         if tag:
-            # JSON 列表包含查询：SQLite 用 json_each；这里用 like 兜底
-            query = query.where(PaperCollection.tags.like(f'%"{tag}"%'))
+            # JSON 列表包含查询：SQLite 默认 json.dumps(ensure_ascii=True)
+            # 会把非 ASCII 字符转义成 \uXXXX，只 LIKE 原文对中文标签必然
+            # 落空 → 同时匹配原文与转义两种存储形态（带引号防子串误配）
+            escaped = json.dumps(tag, ensure_ascii=True)[1:-1]
+            query = query.where(
+                PaperCollection.tags.like(f'%"{tag}"%')
+                | PaperCollection.tags.like(f'%"{escaped}"%')
+            )
         if search:
             query = query.where(PaperCollection.title.ilike(f"%{search}%"))
 
@@ -361,12 +378,17 @@ class PaperService:
                 )
             )
 
-            # 4. 级联删除引用关系（citing 或 cited 任一匹配）
+            # 4. 级联删除引用关系（citing 或 cited 任一匹配）。
+            # 双键空间：引用关系既可能以数据库 id 也可能以外部 paper_id
+            # 建立（历史缺陷：只匹配外部 paper_id，按 DB id 建立的引用
+            # 在删除文献时成为孤儿）
             await db.execute(
                 delete(CitationRelation).where(
                     CitationRelation.user_id == user_id,
                     (CitationRelation.citing_paper_id == paper.paper_id)
-                    | (CitationRelation.cited_paper_id == paper.paper_id),
+                    | (CitationRelation.cited_paper_id == paper.paper_id)
+                    | (CitationRelation.citing_paper_id == paper.id)
+                    | (CitationRelation.cited_paper_id == paper.id),
                 )
             )
 
@@ -423,6 +445,15 @@ class CategoryService:
         color: str = "#6366f1",
         parent_id: str | None = None,
     ) -> dict[str, Any]:
+        # 重名预检：唯一约束兜底并发（原实现直插，重名抛 IntegrityError → 500）
+        existing = await db.execute(
+            select(PaperCategory).where(
+                PaperCategory.user_id == user_id, PaperCategory.name == name
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise CategoryAlreadyExistsError()
+
         category = PaperCategory(
             id=str(uuid.uuid4()),
             user_id=user_id,
@@ -432,7 +463,13 @@ class CategoryService:
             parent_id=parent_id,
         )
         db.add(category)
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError as e:
+            # 并发场景下另一请求先插入
+            await db.rollback()
+            logger.warning(f"用户 {user_id} 创建分类触发唯一约束: {name}")
+            raise CategoryAlreadyExistsError() from e
         await db.refresh(category)
         return category_to_dict(category)
 
@@ -510,6 +547,15 @@ class TagService:
         name: str,
         color: str = "#10b981",
     ) -> dict[str, Any]:
+        # 重名预检：唯一约束兜底并发（与 create_category 同语义）
+        existing = await db.execute(
+            select(PaperTag).where(
+                PaperTag.user_id == user_id, PaperTag.name == name
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise TagAlreadyExistsError()
+
         tag = PaperTag(
             id=str(uuid.uuid4()),
             user_id=user_id,
@@ -517,7 +563,12 @@ class TagService:
             color=color,
         )
         db.add(tag)
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError as e:
+            await db.rollback()
+            logger.warning(f"用户 {user_id} 创建标签触发唯一约束: {name}")
+            raise TagAlreadyExistsError() from e
         await db.refresh(tag)
         return tag_to_dict(tag)
 
@@ -537,15 +588,15 @@ class TagService:
         if not tag:
             raise TagNotFoundError()
 
-        # 从所有 papers 的 tags 列表里移除
-        papers_result = await db.execute(
-            select(PaperCollection).where(
-                PaperCollection.user_id == user_id,
-                PaperCollection.tags.like(f'%"{tag.name}"%'),
-            )
+        # 从所有 papers 的 tags 列表里移除。
+        # Python 侧过滤而非 LIKE：JSON 存储的非 ASCII 字符被转义成
+        # \uXXXX（ensure_ascii=True），LIKE 原文对中文标签必然落空，
+        # 且 Python 过滤对两种存储形态都正确
+        user_papers = await db.execute(
+            select(PaperCollection).where(PaperCollection.user_id == user_id)
         )
-        for p in papers_result.scalars().all():
-            if p.tags:
+        for p in user_papers.scalars().all():
+            if p.tags and tag.name in p.tags:
                 p.tags = [t for t in p.tags if t != tag.name]
 
         await db.execute(
@@ -839,11 +890,17 @@ class CitationService:
     async def _lookup_title(
         self, db: AsyncSession, user_id: str, paper_id: str
     ) -> str | None:
-        """从 PaperCollection 查询 paper_id 对应的 title"""
+        """从 PaperCollection 查询 title（双键：数据库 id 或外部 paper_id）。
+
+        历史缺陷：只匹配外部 paper_id——而 add_citation 的调用方（含
+        fork 与 HTTP API）传的是数据库 id，导致 citing/cited_title
+        回填永远为 None。
+        """
         result = await db.execute(
             select(PaperCollection.title).where(
                 PaperCollection.user_id == user_id,
-                PaperCollection.paper_id == paper_id,
+                (PaperCollection.id == paper_id)
+                | (PaperCollection.paper_id == paper_id),
             )
         )
         return result.scalar_one_or_none()

@@ -241,14 +241,17 @@ async def create_category(
     db: AsyncSession = Depends(get_db),
 ) -> CategoryResponse:
     """创建分类"""
-    data = await library_service.categories.create_category(
-        db,
-        current_user.id,
-        name=request.name,
-        description=request.description,
-        color=request.color,
-        parent_id=request.parent_id,
-    )
+    try:
+        data = await library_service.categories.create_category(
+            db,
+            current_user.id,
+            name=request.name,
+            description=request.description,
+            color=request.color,
+            parent_id=request.parent_id,
+        )
+    except LibraryError as e:
+        raise _map_library_error(e) from e
     return CategoryResponse(**data)
 
 
@@ -287,9 +290,12 @@ async def create_tag(
     db: AsyncSession = Depends(get_db),
 ) -> TagResponse:
     """创建标签"""
-    data = await library_service.tags.create_tag(
-        db, current_user.id, name=request.name, color=request.color
-    )
+    try:
+        data = await library_service.tags.create_tag(
+            db, current_user.id, name=request.name, color=request.color
+        )
+    except LibraryError as e:
+        raise _map_library_error(e) from e
     return TagResponse(**data)
 
 
