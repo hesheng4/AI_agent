@@ -197,4 +197,4 @@ README 现措辞（"4 处 TODO、未实现"）**低估了**该模块，需改。
 | 7 share_links + fork | ✅ 表+服务+API+e2e；G8 黄金计数全等；前端「分享与 Fork」页 |
 | 8 前端 | 结果存档/分享两页 + coordinator save_artifact 开关 + refresh single-flight + isTokenExpired + PWA 不缓存 API + 残留文件清理；tsc 与 build 零报错 |
 
-门禁终态：G2 ruff=0 ✅ / G3 pytest **575 passed** 全绿（unit+integration+e2e 同进程）/ G4 基线 890 → **0** 已重生成并通过 --check ✅ / G7 ✅ / G8 ✅ / G5 README 数字已同步实测 ✅。
+门禁终态：G2 ruff=0 ✅ / G3 pytest **580 passed** 全绿（unit+integration+e2e 同进程）/ G4 基线 890 → **0** 已重生成并通过 --check ✅ / G7 ✅ / G8 ✅ / G5 README 数字已同步实测 ✅。

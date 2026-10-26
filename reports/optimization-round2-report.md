@@ -156,6 +156,6 @@
 | 新真缺陷 | data/agent.py anova/nonparametric/survival/chi2 分支缺必填列校验（缺参时 None 直入统计工具报错难懂）→ 补 ValidationException（与 group 分支对齐） |
 | 模型 | artifacts/shares 新模型同步转 Mapped[]；billing UserAccount/UsageRecord 补 user_id/timestamp 索引 |
 | 类型收窄 | 5 个 agent 的 task 分派 `str(request.get("task", ""))`；writing.py 响应字段判空；gather 结果 BaseException 收窄（BaseException 而非 Exception，覆盖 CancelledError）；experiment/tools ndarray 变量改名；sorted/max key 用 lambda；json.loads/getattr/cache.get 返回 cast |
-| 新测试 | tests/e2e/test_export_billing_chain.py（export 5 端点 + billing 3 端点 HTTP 冒烟，清偿 2 个零覆盖模块） |
+| 新测试 | tests/e2e/test_export_billing_chain.py（export 5 端点 + billing 3 端点 HTTP 冒烟）与 tests/e2e/test_data_analysis_chain.py（data 3 端点：真实统计数值断言 + FakeLLM 桩），清偿 3 个零覆盖模块 |
 
-**最终门禁（2026-10-26）**：ruff 0 / pytest **575 passed, 1 skipped** / mypy **0**（基线 890 → 0）。
+**最终门禁（2026-10-26）**：ruff 0 / pytest **580 passed, 1 skipped** / mypy **0**（基线 890 → 0）。
