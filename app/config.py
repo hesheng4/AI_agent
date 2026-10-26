@@ -1,7 +1,7 @@
 from functools import lru_cache
 
-from pydantic import ConfigDict, field_validator
-from pydantic_settings import BaseSettings
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 视为未修改的默认 SECRET_KEY，生产环境必须替换
 _INSECURE_SECRET_PREFIX = "your-secret-key"
@@ -174,7 +174,9 @@ class Settings(BaseSettings):
     # 每用户保留的 run 记录上限（cap-on-write，写入后裁剪最旧）
     RUN_RETENTION_LIMIT: int = 50
 
-    model_config = ConfigDict(
+    # SettingsConfigDict（pydantic-settings 专用）：ConfigDict 缺 env_file 等
+    # 键的类型声明，运行时行为一致但类型层报 unknown-key
+    model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
     )

@@ -14,7 +14,7 @@ import re
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from app.utils.logger import get_logger
 
@@ -88,7 +88,8 @@ def get_workflow(user_id: str, workflow_id: str) -> dict[str, Any] | None:
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+        return cast("dict[str, Any] | None", loaded)
     except Exception as e:
         logger.warning(f"工作流文件解析失败: {path.name}, err={e}")
         return None

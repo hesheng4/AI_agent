@@ -270,25 +270,31 @@ class CoordinatorAgent(BaseAgent):
                 tasks = [
                     self._execute_with_retry(t, run_recorder) for t in prepared_tasks
                 ]
-                level_results = await asyncio.gather(*tasks, return_exceptions=True)
+                level_results: list[dict[str, Any] | BaseException] = await (
+                    asyncio.gather(*tasks, return_exceptions=True)
+                )
 
                 level_failed = False
-                for i, result in enumerate(level_results):
+                # 独立变量名：mypy 按首次绑定定型，result 在模板分支已被绑为 dict
+                for i, step_result in enumerate(level_results):
                     task = prepared_tasks[i]
-                    if isinstance(result, Exception):
-                        logger.error(f"任务 {task['agent']} 失败: {result}")
+                    # BaseException（而非 Exception）：gather(return_exceptions=True)
+                    # 可能回传 CancelledError 等 BaseException；
+                    # 收窄后 else 分支即纯 dict，无需再断言
+                    if isinstance(step_result, BaseException):
+                        logger.error(f"任务 {task['agent']} 失败: {step_result}")
                         if run_recorder:
                             run_recorder.step_finished(
                                 task["agent"],
                                 status="failed",
-                                error=str(result),
-                                failure_class=classify_failure(result),
+                                error=str(step_result),
+                                failure_class=classify_failure(step_result),
                                 started_at=level_started_at,
                             )
                         results.append(
                             {
                                 "agent": task["agent"],
-                                "result": {"error": str(result)},
+                                "result": {"error": str(step_result)},
                                 "status": "failed",
                             }
                         )
@@ -298,12 +304,12 @@ class CoordinatorAgent(BaseAgent):
                             run_recorder.step_finished(
                                 task["agent"],
                                 status="success",
-                                result=result.get("result"),
+                                result=step_result.get("result"),
                                 started_at=level_started_at,
                             )
-                        results.append(result)
-                        if result.get("status") == "success":
-                            context[task["agent"]] = result["result"]
+                        results.append(step_result)
+                        if step_result.get("status") == "success":
+                            context[task["agent"]] = step_result["result"]
                     completed.add(task["agent"])
                 if fail_fast and level_failed:
                     logger.error("fail-fast: 本层存在失败任务，后续层级不再执行")
@@ -593,7 +599,8 @@ class CoordinatorAgent(BaseAgent):
 
         agent_name = agents_needed[0]
         agent = self.get_agent(agent_name)  # 懒加载
-        return await agent.process(request)
+        result: dict[str, Any] = await agent.process(request)
+        return result
 
     def capability_map(self) -> dict[str, dict[str, Any]]:
         """返回能力地图"""

@@ -451,7 +451,11 @@ class WritingTools:
 
         # 默认 research
         best_type = (
-            max(scores, key=scores.get) if max(scores.values()) > 0 else "research"
+
+                max(scores, key=lambda k: scores[k])
+                if max(scores.values()) > 0
+                else "research"
+
         )
 
         return {

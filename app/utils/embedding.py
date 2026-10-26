@@ -1,5 +1,5 @@
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from openai import APIError, APITimeoutError, AsyncOpenAI, RateLimitError
 
@@ -95,7 +95,8 @@ class EmbeddingClient:
         cached_result = await cache.get(cache_key)
         if cached_result is not None:
             logger.debug("Embedding缓存命中")
-            return cached_result
+            # 缓存里存的就是 float 列表（set 侧已保证）
+            return cast("list[float]", cached_result)
 
         if self._mode == "ascend_local":
             result = await self._embed_npu_local([text])

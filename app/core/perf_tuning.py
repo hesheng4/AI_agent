@@ -1238,7 +1238,7 @@ def diagnose_bottleneck(profiling_summary: dict[str, Any]) -> dict[str, Any]:
         reasons.append(f"通信算子占比 {comm_ratio}%")
 
     # 选出最高分瓶颈
-    top_bottleneck = max(scores, key=scores.get)
+    top_bottleneck = max(scores, key=lambda k: scores[k])
     top_score = scores[top_bottleneck]
 
     if top_score == 0:

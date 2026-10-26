@@ -16,7 +16,7 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from app.config import get_settings
 from app.utils.llm import LLMClient
@@ -229,7 +229,7 @@ def _extract_json(raw: str) -> dict[str, Any] | None:
     """从 LLM 输出中提取 JSON（处理 ```json 包裹）"""
     # 尝试直接解析
     try:
-        return json.loads(raw)
+        return cast("dict[str, Any] | None", json.loads(raw))
     except json.JSONDecodeError:
         pass
 
@@ -237,7 +237,7 @@ def _extract_json(raw: str) -> dict[str, Any] | None:
     m = re.search(r"```json\s*(.*?)\s*```", raw, re.DOTALL)
     if m:
         try:
-            return json.loads(m.group(1))
+            return cast("dict[str, Any] | None", json.loads(m.group(1)))
         except json.JSONDecodeError:
             pass
 
@@ -246,7 +246,7 @@ def _extract_json(raw: str) -> dict[str, Any] | None:
     end = raw.rfind("}")
     if start != -1 and end != -1 and end > start:
         try:
-            return json.loads(raw[start : end + 1])
+            return cast("dict[str, Any] | None", json.loads(raw[start : end + 1]))
         except json.JSONDecodeError:
             pass
 

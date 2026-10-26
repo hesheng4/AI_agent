@@ -626,13 +626,11 @@ class CitationNetwork:
                 binned = (year // bin_years) * bin_years
                 year_counts[binned] += 1
 
-        evolution = sorted(
-            [
-                {"period": f"{y}-{y + bin_years - 1}", "start_year": y, "count": c}
-                for y, c in year_counts.items()
-            ],
-            key=lambda x: x["start_year"],
-        )
+        items: list[dict[str, Any]] = [
+            {"period": f"{y}-{y + bin_years - 1}", "start_year": y, "count": c}
+            for y, c in year_counts.items()
+        ]
+        evolution = sorted(items, key=lambda x: int(x["start_year"]))
 
         return {
             "bin_years": bin_years,
@@ -688,7 +686,7 @@ class CitationNetwork:
                 if not neighbor_comms:
                     continue
 
-                best_comm = max(neighbor_comms, key=neighbor_comms.get)
+                best_comm = max(neighbor_comms, key=lambda cid: neighbor_comms[cid])
                 if best_comm != current_comm:
                     community[pid] = best_comm
                     improved = True

@@ -1,7 +1,7 @@
 """参考文献管理服务 - 自动插入引用、生成参考文献列表"""
 
 import re
-from typing import Any
+from typing import Any, cast
 
 from app.utils.exceptions import ToolException
 from app.utils.logger import get_logger
@@ -192,7 +192,8 @@ class ReferenceManager:
         style_config = CITATION_STYLES[self.style]
         format_func_name = style_config["format_func"]
         format_func = getattr(ReferenceManager, format_func_name)
-        return format_func(paper)
+        # getattr 动态取到的方法返回 Any；各 format_* 实际均返回 str
+        return cast("str", format_func(paper))
 
     def to_bibtex(self, paper: dict[str, Any]) -> str:
         """生成BibTeX条目"""

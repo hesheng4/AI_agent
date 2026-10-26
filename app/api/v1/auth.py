@@ -600,7 +600,9 @@ async def test_api_config(
             "message": "API connection successful",
             "model": response.model,
             "response_preview": (
-                response.choices[0].message.content[:50] if response.choices else ""
+                (response.choices[0].message.content or "")[:50]
+                if response.choices
+                else ""
             ),
         }
     except Exception as e:

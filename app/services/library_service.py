@@ -796,7 +796,7 @@ class CitationService:
 
     async def co_citation(
         self, db: AsyncSession, user_id: str, min_co_citations: int = 1, top_k: int = 50
-    ) -> Any:
+    ) -> dict[str, Any]:
         network = await self._build_network(db, user_id)
         return network.co_citation_analysis(
             min_co_citations=min_co_citations, top_k=top_k
@@ -810,13 +810,13 @@ class CitationService:
 
     async def research_lineage(
         self, db: AsyncSession, user_id: str, paper_id: str, max_depth: int = 5
-    ) -> Any:
+    ) -> dict[str, Any]:
         network = await self._build_network(db, user_id)
         return network.research_lineage(paper_id, max_depth)
 
     async def research_frontier(
         self, db: AsyncSession, user_id: str, year_from: int = 2020, top_k: int = 20
-    ) -> Any:
+    ) -> dict[str, Any]:
         network = await self._build_network(db, user_id)
         return network.research_frontier(year_from, top_k)
 
@@ -826,13 +826,13 @@ class CitationService:
         user_id: str,
         algorithm: str = "louvain",
         min_cluster_size: int = 3,
-    ) -> Any:
+    ) -> dict[str, Any]:
         network = await self._build_network(db, user_id)
         return network.detect_research_clusters(algorithm, min_cluster_size)
 
     async def citation_timeline(
         self, db: AsyncSession, user_id: str, paper_id: str
-    ) -> Any:
+    ) -> dict[str, Any]:
         network = await self._build_network(db, user_id)
         return network.citation_timeline(paper_id)
 

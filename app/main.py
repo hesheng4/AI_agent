@@ -414,9 +414,16 @@ async def health_check() -> dict[str, Any]:
     try:
         from app.core.redis_client import get_redis_client
 
-        redis_client = await get_redis_client()
-        await redis_client.ping()
-        health["redis_healthy"] = True
+        # get_redis 是同步工厂（返回已初始化的客户端或 None），
+        # 历史实现误加了 await：await 非 Awaitable 必抛 TypeError 进 except，
+        # 导致 /health 的 redis_healthy 在 Redis 正常时也永远为 False。
+        redis_client = get_redis_client()
+        if redis_client is not None:
+            await redis_client.ping()
+            health["redis_healthy"] = True
+        else:
+            health["redis_healthy"] = False
+            health["redis_error"] = "unavailable"
     except Exception as e:
         health["redis_healthy"] = False
         health["redis_error"] = "connection failed"

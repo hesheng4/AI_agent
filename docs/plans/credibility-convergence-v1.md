@@ -191,9 +191,10 @@ README 现措辞（"4 处 TODO、未实现"）**低估了**该模块，需改。
 | 步骤 | 状态 |
 |---|---|
 | 4 批次一（按目录切片） | 全部完成：切片 1（agents 198→41）/ 2（api A 205→86）/ 3（api B 167→8）/ 4（core 159→21）/ 5（337→62）；**全量 890 → 58（-93.5%）** |
+| 4.5 清零冲刺 | 同日继续 triage 至 **mypy strict 全清零（0 错/152 文件）**；新增 /health Redis await 真缺陷修复与 export/billing HTTP 冒烟 |
 | 5 批次二 triage | 12 项真缺陷修复（B1–B12）+ 7 项安全加固（S1–S6、S10），均带回归测试；另有 User 模型 Mapped[] 转换清偿 52+ 条 Column 连带错误 |
 | 6 agent_artifacts | ✅ 表+迁移 e8a4f2c6b9d1+服务+API+e2e；G7 全链路通过；orchestrate 支持 save_artifact opt-in；前端「结果存档」页 |
 | 7 share_links + fork | ✅ 表+服务+API+e2e；G8 黄金计数全等；前端「分享与 Fork」页 |
 | 8 前端 | 结果存档/分享两页 + coordinator save_artifact 开关 + refresh single-flight + isTokenExpired + PWA 不缓存 API + 残留文件清理；tsc 与 build 零报错 |
 
-门禁终态：G2 ruff=0 ✅ / G3 pytest **567 passed** 全绿（unit+integration+e2e 同进程）/ G4 基线 890 → 58 已重生成并通过 --check ✅ / G7 ✅ / G8 ✅ / G5 README 数字已同步实测 ✅。
+门禁终态：G2 ruff=0 ✅ / G3 pytest **575 passed** 全绿（unit+integration+e2e 同进程）/ G4 基线 890 → **0** 已重生成并通过 --check ✅ / G7 ✅ / G8 ✅ / G5 README 数字已同步实测 ✅。

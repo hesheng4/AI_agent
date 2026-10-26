@@ -54,12 +54,14 @@ class RunWorkflowRequest(BaseModel):
 
 
 @router.get("/")
-async def list_all(user: User = Depends(get_current_user)):
+async def list_all(user: User = Depends(get_current_user)) -> dict[str, Any]:
     return {"workflows": list_workflows(user.id)}
 
 
 @router.get("/{workflow_id}")
-async def get_one(workflow_id: str, user: User = Depends(get_current_user)):
+async def get_one(
+    workflow_id: str, user: User = Depends(get_current_user)
+) -> dict[str, Any]:
     wf = get_workflow(user.id, workflow_id)
     if not wf or wf.get("created_by") != user.id:
         raise HTTPException(404, "工作流不存在")
@@ -67,7 +69,9 @@ async def get_one(workflow_id: str, user: User = Depends(get_current_user)):
 
 
 @router.post("/")
-async def create(req: CreateWorkflowRequest, user: User = Depends(get_current_user)):
+async def create(
+    req: CreateWorkflowRequest, user: User = Depends(get_current_user)
+) -> dict[str, Any]:
     # req.model_dump() 已将 nodes/edges 序列化为 dict 列表，无需二次转换 (T1)
     return create_workflow(user.id, req.model_dump())
 
@@ -75,7 +79,7 @@ async def create(req: CreateWorkflowRequest, user: User = Depends(get_current_us
 @router.put("/{workflow_id}")
 async def update(
     workflow_id: str, req: UpdateWorkflowRequest, user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
     # 仅保留非 None 字段；model_dump() 已序列化 nodes/edges (T2)
     data = {k: v for k, v in req.model_dump().items() if v is not None}
     result = update_workflow(user.id, workflow_id, data)
@@ -85,14 +89,18 @@ async def update(
 
 
 @router.delete("/{workflow_id}")
-async def delete(workflow_id: str, user: User = Depends(get_current_user)):
+async def delete(
+    workflow_id: str, user: User = Depends(get_current_user)
+) -> dict[str, str]:
     if not delete_workflow(user.id, workflow_id):
         raise HTTPException(404, "工作流不存在")
     return {"status": "deleted"}
 
 
 @router.post("/{workflow_id}/run")
-async def run(workflow_id: str, user: User = Depends(get_current_user)):
+async def run(
+    workflow_id: str, user: User = Depends(get_current_user)
+) -> dict[str, Any]:
     """执行自定义工作流 DAG"""
     wf = get_workflow(user.id, workflow_id)
     if not wf or wf.get("created_by") != user.id:

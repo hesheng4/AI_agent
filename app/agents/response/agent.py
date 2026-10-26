@@ -22,7 +22,7 @@ class ResponseAgent(BaseAgent):
         super().__init__(name="response", tools=["draft", "audit", "revise"])
 
     async def process(self, request: dict[str, Any]) -> dict[str, Any]:
-        task = request.get("task")
+        task = str(request.get("task", ""))
 
         task_handlers = {
             "draft": self.draft,

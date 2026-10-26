@@ -143,7 +143,7 @@ class LiteratureAgent(BaseAgent):
                     self.logger.warning(
                         f"总结第{i + 1}篇文献失败: {res}", exc_info=False
                     )
-                else:
+                elif isinstance(res, dict):
                     ok_summaries.append(res)
 
             if not ok_summaries:

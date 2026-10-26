@@ -1,6 +1,6 @@
 import json
 import math
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd  # type: ignore[import-untyped]  # pandas-stubs 未安装
@@ -15,7 +15,7 @@ logger = get_logger("agent.data")
 
 
 def _sanitize_for_json(obj: Any) -> Any:
-    """递归清洗结果中的 NaN / numpy 类型，确保 JSON 可序列化"""
+    """递归清洗结果中的 NaN / numpy 类型，确保 JSON 可序列化（调用点按 dict 使用）"""
     if isinstance(obj, dict):
         return {k: _sanitize_for_json(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
@@ -56,7 +56,7 @@ class DataAgent(BaseAgent):
         }
 
     async def process(self, request: dict[str, Any]) -> dict[str, Any]:
-        task = request.get("task")
+        task = str(request.get("task", ""))
         handler = self._handlers.get(task)
         if handler:
             return await handler(request)
@@ -113,6 +113,8 @@ class DataAgent(BaseAgent):
             value_col = request.get("value_col")
             two_way = request.get("two_way", False)
             factor_b = request.get("factor_b")
+            if not group_col or not value_col:
+                raise ValidationException("方差分析需要group_col和value_col参数")
             results = self.tools_handler.anova_analysis(
                 df, group_col, value_col, two_way=two_way, factor_b=factor_b
             )
@@ -120,6 +122,8 @@ class DataAgent(BaseAgent):
             group_col = request.get("group_col")
             value_col = request.get("value_col")
             test = request.get("test", "mannwhitney")
+            if not group_col or not value_col:
+                raise ValidationException("非参数检验需要group_col和value_col参数")
             results = self.tools_handler.nonparametric_test(
                 df, group_col, value_col, test=test
             )
@@ -127,12 +131,16 @@ class DataAgent(BaseAgent):
             time_col = request.get("time_col")
             event_col = request.get("event_col")
             group_col = request.get("group_col")
+            if not time_col or not event_col:
+                raise ValidationException("生存分析需要time_col和event_col参数")
             results = self.tools_handler.survival_analysis(
                 df, time_col, event_col, group_col=group_col
             )
         elif analysis_type == "chi2":
             row_col = request.get("row_col")
             col_col = request.get("col_col")
+            if not row_col or not col_col:
+                raise ValidationException("卡方检验需要row_col和col_col参数")
             results = self.tools_handler.chi_square_test(df, row_col, col_col)
         else:
             results = {"error": f"不支持的分析类型: {analysis_type}"}
@@ -174,14 +182,17 @@ class DataAgent(BaseAgent):
             temperature=self._DETERMINISTIC_TEMPERATURE,
         )
 
-        return _sanitize_for_json(
-            {
-                "status": "success",
-                "chart_type": chart_type,
-                "columns": list(df.columns),
-                "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()},
-                "recommendation": recommendation,
-            }
+        return cast(
+            "dict[str, Any]",
+            _sanitize_for_json(
+                {
+                    "status": "success",
+                    "chart_type": chart_type,
+                    "columns": list(df.columns),
+                    "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()},
+                    "recommendation": recommendation,
+                }
+            ),
         )
 
     async def upload(self, request: dict[str, Any]) -> dict[str, Any]:
@@ -196,8 +207,11 @@ class DataAgent(BaseAgent):
             df = self._to_dataframe(data)
             summary = self.tools_handler.get_data_summary(df)
 
-            return _sanitize_for_json(
-                {"status": "success", "filename": filename, "summary": summary}
+            return cast(
+                "dict[str, Any]",
+                _sanitize_for_json(
+                    {"status": "success", "filename": filename, "summary": summary}
+                ),
             )
         except Exception as e:
             raise AgentException(f"数据处理失败: {str(e)}", self.name)
@@ -213,7 +227,10 @@ class DataAgent(BaseAgent):
             df = self._to_dataframe(data)
             summary = self.tools_handler.get_data_summary(df)
 
-            return _sanitize_for_json({"status": "success", "summary": summary})
+            return cast(
+                "dict[str, Any]",
+                _sanitize_for_json({"status": "success", "summary": summary}),
+            )
         except Exception as e:
             raise AgentException(f"数据概览失败: {str(e)}", self.name)
 

@@ -119,8 +119,8 @@ async def warmup_ascend() -> dict[str, Any]:
         try:
             from app.utils.embedding import get_embedding_client
 
-            client = get_embedding_client()
-            embedding = await client.embed("测试文本")
+            embedding_client = get_embedding_client()
+            embedding = await embedding_client.embed("测试文本")
             results["embedding_warmup"] = "ok"
             results["embedding_dim"] = len(embedding)
         except Exception as e:

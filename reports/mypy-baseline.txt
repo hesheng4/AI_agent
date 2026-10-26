@@ -1,29 +1,4 @@
 # mypy 基线 —— 由 scripts/gen_mypy_baseline.py 生成，请勿手工编辑
 # 格式：<文件>:<该文件的 mypy 错误数>；首行为基线总数
 # 规则：改动文件的错误数不得高于本基线；新增文件必须为 0；基线总数单调不增
-# total 58
-app/agents/citation/agent.py:1
-app/agents/coordinator/agent.py:2
-app/agents/data/agent.py:12
-app/agents/data/tools.py:2
-app/agents/data_agent/agent.py:1
-app/agents/experiment/tools.py:2
-app/agents/literature/agent.py:1
-app/agents/response/agent.py:1
-app/agents/reviewer/agent.py:1
-app/agents/writing/agent.py:1
-app/agents/writing/tools.py:1
-app/api/v1/ascend.py:2
-app/api/v1/auth.py:1
-app/api/v1/billing.py:2
-app/api/v1/library.py:5
-app/api/v1/workflows.py:6
-app/api/v1/writing.py:4
-app/config.py:2
-app/core/agent_generator.py:3
-app/core/perf_tuning.py:1
-app/core/workflows.py:1
-app/main.py:1
-app/services/citation_network.py:3
-app/services/reference.py:1
-app/utils/embedding.py:1
+# total 0

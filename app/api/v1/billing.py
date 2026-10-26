@@ -16,8 +16,8 @@ router = APIRouter()
 
 class QuotaCheckResponse(BaseModel):
     allowed: bool
-    reason: str = None
-    plan: str = None
+    reason: str | None = None
+    plan: str | None = None
 
 
 class UsageResponse(BaseModel):

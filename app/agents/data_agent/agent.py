@@ -35,7 +35,7 @@ class DataAvailabilityAgent(BaseAgent):
         }
 
     async def process(self, request: dict[str, Any]) -> dict[str, Any]:
-        task = request.get("task")
+        task = str(request.get("task", ""))
         handler = self._task_handlers.get(task)
         if handler:
             return await handler(request)

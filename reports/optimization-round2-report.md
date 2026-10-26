@@ -120,8 +120,8 @@
 | 门禁 | 状态 |
 |---|---|
 | ruff `app` | **0** ✅ |
-| pytest | **567 passed, 1 skipped**（基线 545 + 新增 22 用例；unit+integration+e2e 同进程全绿） |
-| mypy | **890 → 58**（-93.5%），基线已重生成，`--check` 门禁通过（单调不增） |
+| pytest | **575 passed, 1 skipped**（基线 545 + 新增 30 用例；unit+integration+e2e 同进程全绿） |
+| mypy | **890 → 0**（152 文件 strict 全清零），基线已重生成，`--check` 门禁通过 |
 | G7 artifacts | ✅ e2e 全链路（创建→列表→筛选→重新导出→删除→隔离→401） |
 | G8 share/fork | ✅ 黄金计数全等（文献/分类/标签/笔记/引用/usage_count/paper_count 逐一相等） |
 | G4 | ✅ 基线 890 → 58 单调不增 |
@@ -143,3 +143,19 @@
 5. **前端**：react-query 落地或移除配置；vitest 引入；`@capacitor` 死依赖移除；PWA 不缓存认证 GET。
 6. **`Column(JSON, default=[])` → `default=list`**（一行级修复，防跨行串数据）。
 7. 删除 `find_run_any_user` 或加调用方断言。
+
+---
+
+## 4. 清零冲刺补记（同日第二批）
+
+切片 5 合并后继续 triage 清偿至 **mypy strict 全清零**（890 → 0）：
+
+| 类别 | 内容 |
+|---|---|
+| 新真缺陷 | `/health` 对同步 `get_redis()` 误加 `await` → Redis 正常时也永远 unhealthy（await 非 Awaitable 必抛 TypeError） |
+| 新真缺陷 | data/agent.py anova/nonparametric/survival/chi2 分支缺必填列校验（缺参时 None 直入统计工具报错难懂）→ 补 ValidationException（与 group 分支对齐） |
+| 模型 | artifacts/shares 新模型同步转 Mapped[]；billing UserAccount/UsageRecord 补 user_id/timestamp 索引 |
+| 类型收窄 | 5 个 agent 的 task 分派 `str(request.get("task", ""))`；writing.py 响应字段判空；gather 结果 BaseException 收窄（BaseException 而非 Exception，覆盖 CancelledError）；experiment/tools ndarray 变量改名；sorted/max key 用 lambda；json.loads/getattr/cache.get 返回 cast |
+| 新测试 | tests/e2e/test_export_billing_chain.py（export 5 端点 + billing 3 端点 HTTP 冒烟，清偿 2 个零覆盖模块） |
+
+**最终门禁（2026-10-26）**：ruff 0 / pytest **575 passed, 1 skipped** / mypy **0**（基线 890 → 0）。

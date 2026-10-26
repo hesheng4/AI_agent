@@ -279,10 +279,10 @@ class ExperimentTools:
                 "message": "无相似历史数据",
             }
 
-        # 加权平均预测
-        weights = np.array(weights)
-        predictions = np.array(predictions)
-        weighted_pred = np.average(predictions, weights=weights)
+        # 加权平均预测（新变量名：list 与 ndarray 不共用一个绑定）
+        weights_arr = np.asarray(weights, dtype=float)
+        predictions_arr = np.asarray(predictions, dtype=float)
+        weighted_pred = np.average(predictions_arr, weights=weights_arr)
 
         # 计算置信区间
         std = np.std(predictions)

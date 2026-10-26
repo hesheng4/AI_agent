@@ -59,7 +59,7 @@ class WritingAgent(BaseAgent):
         }
 
     async def process(self, request: dict[str, Any]) -> dict[str, Any]:
-        task = request.get("task")
+        task = str(request.get("task", ""))
         # 用户级 API 配置由 request dict 透传给 handler（不经实例属性，避免并发污染）
         handler = self._task_handlers.get(task)
         if handler:

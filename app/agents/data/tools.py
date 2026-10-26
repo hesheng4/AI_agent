@@ -353,19 +353,22 @@ class DataTools:
 
         try:
             if two_way:
-                subset = df[[group_col, factor_b, value_col]].dropna()
+                # 收窄后的局部名：mypy 收窄不跨推导式作用域，
+                # 直接在推导式里用 factor_b（str | None）会把键型放宽
+                factor_b_name = factor_b or ""
+                subset = df[[group_col, factor_b_name, value_col]].dropna()
                 if len(subset) < 4:
                     return {"error": "双因素方差分析数据不足"}
                 data_list = [
                     {
                         group_col: str(row[group_col]),
-                        factor_b: str(row[factor_b]),
+                        factor_b_name: str(row[factor_b_name]),
                         value_col: float(row[value_col]),
                     }
                     for _, row in subset.iterrows()
                 ]
                 return StatisticsEnhancer.two_way_anova(
-                    data_list, group_col, factor_b, value_col
+                    data_list, group_col, factor_b_name, value_col
                 )
             else:
                 subset = df[[group_col, value_col]].dropna()

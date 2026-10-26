@@ -26,7 +26,7 @@ class ReviewerAgent(BaseAgent):
         super().__init__(name="reviewer", tools=["assess", "score", "quick-check"])
 
     async def process(self, request: dict[str, Any]) -> dict[str, Any]:
-        task = request.get("task")
+        task = str(request.get("task", ""))
 
         task_handlers = {
             "assess": self.assess,

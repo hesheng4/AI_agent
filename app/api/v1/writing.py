@@ -247,9 +247,9 @@ async def generate_content(
 
     return GenerateResponse(
         status="success",
-        section=result.get("section"),
-        content=result.get("content"),
-        paper_type=result.get("paper_type", "research"),
+        section=str(result.get("section") or ""),
+        content=str(result.get("content") or ""),
+        paper_type=str(result.get("paper_type") or "research"),
     )
 
 
@@ -274,8 +274,8 @@ async def polish_text(
 
     return PolishResponse(
         status="success",
-        original=result.get("original"),
-        polished=result.get("polished"),
+        original=str(result.get("original") or ""),
+        polished=str(result.get("polished") or ""),
         terminology_ledger=result.get("terminology_ledger"),
     )
 
