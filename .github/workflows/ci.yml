@@ -2,8 +2,8 @@ name: CI
 
 # 可信度收敛 v1 的机器仲裁者。三条门禁，任一红即阻断：
 #   1. ruff   —— 硬门禁，必须 0 error
-#   2. mypy   —— 基线文件 + 改动文件增量归零（存量 890 冻结，单调不增）
-#   3. pytest —— 必须 ≥545 passed 且 0 failed
+#   2. mypy   —— 基线文件 + 改动文件增量归零（已全清零，必须保持 0）
+#   3. pytest —— 必须 ≥608 passed 且 0 failed
 # 契约见 docs/plans/credibility-convergence-v1.md
 
 on:
@@ -22,9 +22,9 @@ env:
   DEBUG: "true"
   PYTHONIOENCODING: utf-8
   PYTHONDONTWRITEBYTECODE: "1"
-  # mypy 基线总数（2026-09-07 实测）。改这个值等于改契约，需同步改契约文档。
-  MYPY_BASELINE_TOTAL: "890"
-  PYTEST_BASELINE: "545"
+  # mypy 基线总数（2026-10-27 实测，strict 全清零）。改这个值等于改契约，需同步改契约文档。
+  MYPY_BASELINE_TOTAL: "0"
+  PYTEST_BASELINE: "608"
 
 jobs:
   lint:
