@@ -1,0 +1,153 @@
+name: CI
+
+# 可信度收敛 v1 的机器仲裁者。三条门禁，任一红即阻断：
+#   1. ruff   —— 硬门禁，必须 0 error
+#   2. mypy   —— 基线文件 + 改动文件增量归零（存量 890 冻结，单调不增）
+#   3. pytest —— 必须 ≥545 passed 且 0 failed
+# 契约见 docs/plans/credibility-convergence-v1.md
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 本地 .env 为 DEBUG=true 且未被 git 跟踪，CI 无 .env。
+  # 必须显式给，否则 Settings.validate_security() 按生产基线拒绝启动。
+  DEBUG: "true"
+  PYTHONIOENCODING: utf-8
+  PYTHONDONTWRITEBYTECODE: "1"
+  # mypy 基线总数（2026-09-07 实测）。改这个值等于改契约，需同步改契约文档。
+  MYPY_BASELINE_TOTAL: "890"
+  PYTEST_BASELINE: "545"
+
+jobs:
+  lint:
+    name: ruff（硬门禁）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: ruff check
+        run: ruff check app
+
+      - name: black --check（仅提示，不阻断）
+        # 已知冲突 R7：black 按字符数算行宽，ruff E501 按显示宽度算（CJK 记 2），
+        # 中文行会出现 black 认为未超、ruff 认为已超。故 black 暂不设硬门禁。
+        continue-on-error: true
+        run: black --check app
+
+  typecheck:
+    name: mypy（基线 + 增量归零）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: 计算改动文件
+        id: changed
+        run: |
+          set -uo pipefail
+          BASE=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}" || true
+            BASE="origin/${{ github.base_ref }}"
+          elif git rev-parse HEAD~1 >/dev/null 2>&1; then
+            BASE="HEAD~1"
+          fi
+          if [ -n "$BASE" ]; then
+            git diff --name-only "$BASE"...HEAD -- 'app/**/*.py' > changed.txt || true
+          else
+            : > changed.txt
+          fi
+          if [ -s changed.txt ]; then
+            echo "mode=files" >> "$GITHUB_OUTPUT"
+            echo "改动文件 $(wc -l < changed.txt) 个"
+          else
+            echo "mode=full" >> "$GITHUB_OUTPUT"
+            echo "未取得改动文件列表，退回全量校验"
+          fi
+
+      - name: mypy 增量校验
+        # gen_mypy_baseline.py --check 同时校验两件事：
+        #   ① 改动文件的错误数不得高于基线（新文件基数为 0，即必须为 0）
+        #   ② 全量总数不得高于基线总数（单调不增）
+        run: |
+          if [ "${{ steps.changed.outputs.mode }}" = "files" ]; then
+            python scripts/gen_mypy_baseline.py --check --stdin < changed.txt
+          else
+            python scripts/gen_mypy_baseline.py --check
+          fi
+
+      - name: 守卫：基线文件未被擅自抬高
+        run: |
+          TOTAL=$(grep -m1 '^# total ' reports/mypy-baseline.txt | awk '{print $3}')
+          echo "基线文件记录总数：$TOTAL / 契约：$MYPY_BASELINE_TOTAL"
+          if [ "$TOTAL" -gt "$MYPY_BASELINE_TOTAL" ]; then
+            echo "::error::基线总数被抬高到 $TOTAL（契约 $MYPY_BASELINE_TOTAL），违反单调不增"
+            exit 1
+          fi
+
+  test:
+    name: pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: pytest + 基线守卫
+        # 只跑一次。既要求 0 failed，也要求 passed ≥ 545 ——
+        # 后者防止测试被误删或未被收集（776 那种失真数字的机器防线）。
+        run: |
+          set -o pipefail
+          pytest -q --no-header 2>&1 | tee pytest-out.txt
+          PASSED=$(grep -oP '\d+(?= passed)' pytest-out.txt | tail -1)
+          FAILED=$(grep -oP '\d+(?= failed)' pytest-out.txt | tail -1)
+          PASSED=${PASSED:-0}
+          FAILED=${FAILED:-0}
+          echo "passed=$PASSED failed=$FAILED（基线 $PYTEST_BASELINE）"
+          if [ "$FAILED" != "0" ]; then
+            echo "::error::存在失败用例：$FAILED"
+            exit 1
+          fi
+          if [ "$PASSED" -lt "$PYTEST_BASELINE" ]; then
+            echo "::error::通过数 $PASSED 低于基线 $PYTEST_BASELINE（测试被删或未收集）"
+            exit 1
+          fi
+          echo "✅ $PASSED passed ≥ 基线 $PYTEST_BASELINE，且 0 failed"
