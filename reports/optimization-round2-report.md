@@ -179,4 +179,11 @@ library CRUD 全量 27 端点 + experiment 纯计算 2 端点 + research 域 LLM
 | L5 | `get_citation_graph` 同一引用出边+入边各输出一次 → 前端画重叠边 | seen_edges 去重 |
 | L6 | `create_category/create_tag` 重名抛 IntegrityError → 500（应 400） | 预检 + 兜底 + 路由映射 |
 
-**门禁（2026-10-27）**：ruff 0 / pytest **604 passed, 1 skipped** / mypy **0**。
+**门禁（2026-10-27）**：ruff 0 / pytest **608 passed, 1 skipped** / mypy **0**。
+
+第三批补充：WebSocket 事件通道 HTTP 层测试（认证拒绝/归属校验/事件推送 4 用例），
+并挖出第 7 个真缺陷——`task_ws` 用 `asyncio.gather` 等待「事件推送 + 断开监听」，
+客户端断开后 `send_events` 永远阻塞在 `queue.get()` → **gather 永不返回，
+finally 的 unsubscribe 永不执行**（订阅队列与任务泄漏，长会话下持续累积）。
+改为 `asyncio.wait(FIRST_COMPLETED)` + 取消 pending。同批清理：@capacitor 死依赖、
+tests/integration/api 空目录。

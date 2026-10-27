@@ -287,7 +287,7 @@ research-agent-platform/
 │   └── versions/
 │       └── 6ab33371ef5b_initial_baseline.py  # 初始 baseline（8 表 + 10 索引）
 ├── alembic.ini                # Alembic 配置
-├── tests/                     # 测试（604 passed / 1 skipped，2026-10-27 实测；mypy strict 全清零）
+├── tests/                     # 测试（608 passed / 1 skipped，2026-10-27 实测；mypy strict 全清零）
 │   ├── unit/                 # 单元测试（含数值黄金测试，见下）
 │   │   ├── test_numerical_golden.py        # 数值黄金测试：scipy 为 oracle 校验手写统计/功效实现
 │   │   └── test_citation_network_golden.py # 引用网络黄金测试：受控图解析解对照

@@ -49,25 +49,42 @@ async def task_ws(
     queue = event_bus.subscribe(task_id)
     logger.info(f"WS 已连接: task={task_id}, user={payload.get('sub')}")
 
-    try:
-        # 双任务：1) 从事件队列推送到 WS  2) 监听 WS 关闭
-        async def send_events() -> None:
-            while True:
-                event = await queue.get()
-                try:
-                    await websocket.send_json(event)
-                except Exception:
-                    break
-
-        async def recv_keepalive() -> None:
-            """接收客户端消息（ping/pong 或关闭检测）"""
+    async def send_events() -> None:
+        while True:
+            event = await queue.get()
             try:
-                while True:
-                    await websocket.receive_text()
-            except WebSocketDisconnect:
-                pass
+                await websocket.send_json(event)
+            except Exception:
+                break
 
-        await asyncio.gather(send_events(), recv_keepalive(), return_exceptions=True)
+    async def recv_keepalive() -> None:
+        """接收客户端消息（ping/pong 或关闭检测）"""
+        try:
+            while True:
+                await websocket.receive_text()
+        except WebSocketDisconnect:
+            pass
+
+    try:
+        # 双任务：1) 从事件队列推送到 WS  2) 监听 WS 关闭。
+        # 用 wait(FIRST_COMPLETED) 而非 gather：客户端断开后 recv_keepalive
+        # 返回，而 send_events 永远阻塞在 queue.get()——gather 会等齐，
+        # 导致 finally 的 unsubscribe 永不执行（队列与任务泄漏）
+        send_task = asyncio.create_task(send_events())
+        recv_task = asyncio.create_task(recv_keepalive())
+        done, pending = await asyncio.wait(
+            {send_task, recv_task}, return_when=asyncio.FIRST_COMPLETED
+        )
+        for t in pending:
+            t.cancel()
+        # 吸收取消与异常，避免未消费任务告警
+        for t in pending:
+            try:
+                await t
+            except asyncio.CancelledError:
+                pass
+            except Exception:  # noqa: BLE001 — 断开清理期不再上抛
+                pass
     finally:
         event_bus.unsubscribe(task_id, queue)
         logger.info(f"WS 已断开: task={task_id}")
